@@ -9,6 +9,7 @@ import '@fontsource/cormorant-garamond/400-italic.css'
 import './styles.css'
 import './pages.css'
 import './about.css'
+import './contact.css'
 import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(

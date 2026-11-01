@@ -71,6 +71,6 @@ export const PRODUCTS = [
   },
 ]
 
-export const img = (slug, view) => `/products/${slug}-${view}.webp`
+export const img = (slug, view) => `${import.meta.env.BASE_URL}products/${slug}-${view}.webp`
 export const money = (n) => `$${n}`
 export const pad = (n) => String(n).padStart(2, '0')
