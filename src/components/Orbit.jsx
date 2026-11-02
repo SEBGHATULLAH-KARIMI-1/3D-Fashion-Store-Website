@@ -11,6 +11,8 @@ export default function Orbit({ hidden, onOpen }) {
   const itemRefs = useRef([])
   const st = useRef({ a: 0, target: 0, v: 0, drag: false, moved: 0 })
   const activeRef = useRef(0)
+  const hiddenRef = useRef(hidden)
+  hiddenRef.current = hidden
   const [active, setActive] = useState(0)
 
   const snapBy = useCallback((dir) => {
@@ -22,7 +24,15 @@ export default function Orbit({ hidden, onOpen }) {
   useEffect(() => {
     let raf
     let last = performance.now()
+    let painted = false
     const tick = (now) => {
+      // skip the work while hidden (but paint once so it is ready when shown)
+      if (hiddenRef.current && painted) {
+        last = now
+        raf = requestAnimationFrame(tick)
+        return
+      }
+      painted = true
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       const s = st.current

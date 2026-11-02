@@ -6,4 +6,15 @@ export default defineConfig({
   base: './',
   plugins: [react()],
   server: { port: 5173, open: true },
+  build: {
+    target: 'es2020',
+    rollupOptions: {
+      output: {
+        // React in its own file: cached by the browser between deploys.
+        manualChunks: {
+          react: ['react', 'react-dom'],
+        },
+      },
+    },
+  },
 })

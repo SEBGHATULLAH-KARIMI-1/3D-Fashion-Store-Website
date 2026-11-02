@@ -35,6 +35,8 @@ export default function Rack({ hidden, onOpen }) {
   const sceneRef = useRef(null)
   const phys = useRef(PRODUCTS.map(() => ({ a: 0, v: 0, t: 0 })))
   const hoverRef = useRef(-1)
+  const hiddenRef = useRef(hidden)
+  hiddenRef.current = hidden
   const [hover, setHover] = useState(-1)
   const mid = (PRODUCTS.length - 1) / 2
 
@@ -59,6 +61,12 @@ export default function Rack({ hidden, onOpen }) {
     let raf
     let last = performance.now()
     const tick = (now) => {
+      // nothing to animate while another page or the product view covers the rack
+      if (hiddenRef.current) {
+        last = now
+        raf = requestAnimationFrame(tick)
+        return
+      }
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       phys.current.forEach((s, k) => {
@@ -175,6 +183,11 @@ export default function Rack({ hidden, onOpen }) {
             <span>{money(p.price)}</span>
           </p>
         ))}
+
+        <div className="rack-center-cap" key={PRODUCTS[hover >= 0 ? hover : Math.round(mid)].id}>
+          <b>{PRODUCTS[hover >= 0 ? hover : Math.round(mid)].name}</b>
+          <span>{money(PRODUCTS[hover >= 0 ? hover : Math.round(mid)].price)}</span>
+        </div>
       </div>
     </div>
   )

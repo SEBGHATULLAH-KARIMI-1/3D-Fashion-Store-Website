@@ -1,15 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PRODUCTS, img } from './data/products'
 import { LINKS, useRoute } from './lib/router'
 import Header from './components/Header.jsx'
 import Rack from './components/Rack.jsx'
+import Decor from './components/Decor.jsx'
 import Orbit from './components/Orbit.jsx'
 import Focus from './components/Focus.jsx'
 import Bag from './components/Bag.jsx'
-import Shop from './pages/Shop.jsx'
-import Lookbook from './pages/Lookbook.jsx'
-import About from './pages/About.jsx'
-import Contact from './pages/Contact.jsx'
+// Pages load on demand, so the home page ships a much smaller bundle
+// (About alone pulls in the world map data).
+const loadShop = () => import('./pages/Shop.jsx')
+const loadLookbook = () => import('./pages/Lookbook.jsx')
+const loadAbout = () => import('./pages/About.jsx')
+const loadContact = () => import('./pages/Contact.jsx')
+const Shop = lazy(loadShop)
+const Lookbook = lazy(loadLookbook)
+const About = lazy(loadAbout)
+const Contact = lazy(loadContact)
 
 const DEFAULT_TINT = '#e9e8e4'
 
@@ -84,14 +91,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [nav, bagOpen, ordered, menuOpen, focus])
 
-  // Warm the image cache so everything opens instantly.
+  // When the browser is idle: warm the image cache and fetch the light pages,
+  // so the first paint is not competing with them.
   useEffect(() => {
-    PRODUCTS.forEach((p) =>
-      p.variants.forEach((v) => {
-        new Image().src = img(v.slug, 'front')
-        new Image().src = img(v.slug, 'side')
-      }),
-    )
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200))
+    const cancel = window.cancelIdleCallback || clearTimeout
+    const id = idle(() => {
+      // About is the heaviest page: fetch it first, before the image warm-up competes for the network
+      loadAbout()
+      PRODUCTS.forEach((p) =>
+        p.variants.forEach((v) => {
+          new Image().src = img(v.slug, 'front')
+          new Image().src = img(v.slug, 'side')
+        }),
+      )
+      loadShop()
+      loadLookbook()
+      loadContact()
+    })
+    return () => cancel(id)
   }, [])
 
   // Background parallax (writes CSS vars, no re-render).
@@ -105,14 +123,14 @@ export default function App() {
   const product = focus && PRODUCTS[focus.p]
   const variant = product && product.variants[focus.v]
   const home = route === '/'
-  const dark = route === '/about' && !focus
+  const cool = route === '/about' && !focus
 
   return (
     <div
-      className={`wall ${dark ? 'dark' : ''}`}
+      className="wall"
       ref={wallRef}
       onPointerMove={onWallMove}
-      style={{ '--tint': focus ? variant.wall : dark ? '#0a0908' : DEFAULT_TINT }}
+      style={{ '--tint': focus ? variant.wall : cool ? '#f7f8fc' : DEFAULT_TINT }}
     >
       <Header
         route={route}
@@ -128,6 +146,7 @@ export default function App() {
       />
 
       <main className="stage">
+        <Decor hidden={!!focus || !home} />
         <Rack hidden={!!focus || !home || view !== 'rack'} onOpen={open} />
         <Orbit hidden={!!focus || !home || view !== 'orbit'} onOpen={open} />
 
@@ -140,10 +159,12 @@ export default function App() {
 
       {!home && (
         <div className={`page ${focus ? 'is-hidden' : ''} ${route === '/about' ? 'cine' : ''}`} key={route}>
-          {route === '/shop' && <Shop onOpen={open} onAdd={addToBag} />}
-          {route === '/lookbook' && <Lookbook onOpen={open} />}
-          {route === '/about' && <About />}
-          {route === '/contact' && <Contact />}
+          <Suspense fallback={null}>
+            {route === '/shop' && <Shop onOpen={open} onAdd={addToBag} />}
+            {route === '/lookbook' && <Lookbook onOpen={open} />}
+            {route === '/about' && <About />}
+            {route === '/contact' && <Contact />}
+          </Suspense>
         </div>
       )}
 

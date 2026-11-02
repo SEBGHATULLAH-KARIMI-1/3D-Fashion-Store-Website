@@ -1,562 +1,166 @@
 import { useEffect, useRef, useState } from 'react'
-import { useReveal } from '../lib/useReveal'
-import { tilt } from '../lib/tilt'
-import Title3D from '../components/Title3D.jsx'
-import Footer from '../components/Footer.jsx'
 
 const TOPICS = ['Order', 'Sizing', 'Press', 'Other']
+const EMAIL = 'hello@fancyclothes.example'
 
-const FAQ = [
-  ['How do the sizes fit?', 'Most pieces are cut boxy with a dropped shoulder. If you are between sizes, take the smaller one for a fitted look or the larger one for the intended oversized fit.'],
-  ['Is this a real store?', 'No. Fancy Clothes is a front-end sample. Adding to the bag and checking out are demos, so nothing is charged and nothing ships.'],
-  ['How does shipping work?', 'In a real store this is where delivery times and costs would go. Here it is placeholder text so you can see how the accordion unfolds.'],
-  ['What is the returns policy?', 'Placeholder text again: a typical policy would give you a set number of days to return unworn items with the tags attached.'],
-  ['Who made the 3D effects?', 'All of it is plain CSS 3D transforms and small animation loops written in React and JavaScript. No 3D library is used.'],
+/* ---------- headline: black letters that fade into olive, then the lime "O" ---------- */
+const lerp = (a, b, t) => Math.round(a + (b - a) * t)
+const tone = (t) => `rgb(${lerp(11, 112, t)}, ${lerp(11, 152, t)}, ${lerp(9, 8, t)})`
+const SAY = [
+  ['S', 0],
+  ['A', 0],
+  ['Y', 0],
+]
+const HELL = [
+  ['H', 0],
+  ['E', 0.1],
+  ['L', 0.5],
+  ['L', 0.85],
 ]
 
-const INFO = [
-  ['Email', 'hello@fancyclothes.example'],
-  ['Studio', 'Unit 12, Sample Street'],
-  ['Hours', 'Mon – Fri, 10:00 – 18:00'],
-]
-
-const t = tilt(12)
-
-/* ================================================================
-   Scroll choreography
-   0 ──────── 0.50 ── 0.62 ── 0.76 ───────── 1
-     walk in     reach   raise     on the call
-   ================================================================ */
-const T_WALK = 0.5
-const T_REACH = 0.62
-const T_RAISE = 0.76
-
-const PHASES = [
-  ['walk', 'Walk'],
-  ['reach', 'Reach'],
-  ['raise', 'Pick up'],
-  ['call', 'Talk'],
-]
-const PHASE_TEXT = {
-  walk: 'Incoming call · someone is on the way',
-  reach: 'Reaching for the phone',
-  raise: 'Picked up',
-  call: 'Connected · say hello',
-}
-
-const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v))
-const lerp = (a, b, k) => a + (b - a) * k
-const sm = (k) => k * k * (3 - 2 * k)
-const seg = (p, a, b) => clamp((p - a) / (b - a))
-const RAD = Math.PI / 180
-const DEG = 180 / Math.PI
-const wrap = (a) => ((a + 540) % 360) - 180
-
-const phaseOf = (p) => (p < T_WALK ? 'walk' : p < T_REACH ? 'reach' : p < T_RAISE ? 'raise' : 'call')
-
-/* ---------- geometry of the right arm (screen right) in rig px ----------
-   Feet are at y = 0, up is negative. The arm is solved with two-bone IK
-   in the screen plane, so the hand really lands on the handset. */
-const PED_X = 134 // phone table, to the right of the walker
-const SH = [50, -228] // right shoulder
-const UA = 64 // upper arm length
-const FA = 64 // elbow -> centre of the fist
-const REST = [SH[0] + 8, SH[1] + 116] // hand hanging down
-const CRADLE = [PED_X, -190] // handset lying on the phone
-const EAR = [66, -262] // handset at the ear
-const TILT = 60 // upper arm swings toward the camera by this much at the ear
-const JACK = [PED_X - 52, -116] // where the cord leaves the phone
-const MOUTH = [-7.6, 40.8] // cord end on the handset (handset-local)
-
-// U = upper arm length as seen from the front (it shortens when it swings toward the camera)
-function ik(T, U) {
-  const dx = T[0] - SH[0]
-  const dy = T[1] - SH[1]
-  const d = clamp(Math.hypot(dx, dy), Math.abs(U - FA) + 1, U + FA - 0.5)
-  const base = Math.atan2(dy, dx)
-  const a = Math.acos(clamp((U * U + d * d - FA * FA) / (2 * U * d), -1, 1))
-  let best = null
-  for (const phi of [base - a, base + a]) {
-    const ex = U * Math.cos(phi)
-    const ey = U * Math.sin(phi)
-    const score = ey + 0.6 * ex // prefer the elbow low and to the outside
-    if (!best || score > best.score) best = { phi, score, ex, ey }
+/* ---------- scalloped wax seal outline ---------- */
+const SEAL = (() => {
+  const pts = []
+  for (let i = 0; i < 360; i += 2) {
+    const a = (i * Math.PI) / 180
+    const r = 46 + 2.2 * Math.cos(a * 16)
+    pts.push(`${(50 + r * Math.cos(a)).toFixed(2)} ${(50 + r * Math.sin(a)).toFixed(2)}`)
   }
-  const phiF = Math.atan2(dy - best.ey, dx - best.ex)
-  return { th: wrap(best.phi * DEG - 90), ga: wrap((phiF - best.phi) * DEG) }
+  return `M${pts.join('L')}Z`
+})()
+
+/* ---------- the glowing ring around the envelope (an ellipse rotated -9°) ---------- */
+const RING = { cx: 450, cy: 400, rx: 405, ry: 165, rot: -9 }
+const onRing = (deg) => {
+  const a = (deg * Math.PI) / 180
+  const x = RING.rx * Math.cos(a)
+  const y = RING.ry * Math.sin(a)
+  const t = (RING.rot * Math.PI) / 180
+  return [RING.cx + x * Math.cos(t) - y * Math.sin(t), RING.cy + x * Math.sin(t) + y * Math.cos(t)]
 }
+const [LX, LY] = onRing(212) // lime sphere, left
+const [RX, RY] = onRing(326) // lime sphere, right
+const [SX, SY] = onRing(4) // silver sphere
+const [BX, BY] = onRing(70) // glass bead
 
-// coiled phone cord: a sagging curve with a helix wound around it
-function cordPath(J, K) {
-  const dist = Math.hypot(K[0] - J[0], K[1] - J[1])
-  const C = [(J[0] + K[0]) / 2, Math.min(-6, Math.max(J[1], K[1]) + 36 + dist * 0.18)]
-  const N = 72
-  let d = ''
-  for (let i = 0; i <= N; i++) {
-    const s = i / N
-    const u = 1 - s
-    let x = u * u * J[0] + 2 * u * s * C[0] + s * s * K[0]
-    let y = u * u * J[1] + 2 * u * s * C[1] + s * s * K[1]
-    const k = s * 16 * Math.PI * 2
-    x += Math.cos(k) * 5
-    y = Math.min(-1, y + Math.sin(k) * 3.4)
-    d += `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`
-  }
-  return d
-}
+const Icon = ({ children }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {children}
+  </svg>
+)
 
-// where the sticky stage sticks, measured from the top of the scroll container
-// (sticky offsets start at the container's padding edge, so padding counts)
-function stickTop(page, stage) {
-  const pad = parseFloat(getComputedStyle(page).paddingTop) || 0
-  return pad + (parseFloat(getComputedStyle(stage).top) || 0)
-}
+const Sparkle = ({ x, y, s = 1, d = '0s' }) => (
+  <g transform={`translate(${x} ${y}) scale(${s})`}>
+    <path
+      className="kc-twinkle"
+      style={{ '--d': d }}
+      d="M0 -10 Q1.3 -1.3 10 0 Q1.3 1.3 0 10 Q-1.3 1.3 -10 0 Q-1.3 -1.3 0 -10Z"
+      fill="#fff"
+      stroke="#d6ff3a"
+      strokeOpacity=".5"
+      strokeWidth=".8"
+    />
+  </g>
+)
 
-// Everything that moves is a number written to a CSS variable.
-// "l" = left side of the screen, "r" = right side of the screen.
-function poseFor(p) {
-  const w = seg(p, 0, T_WALK)
-  const we = 1 - Math.pow(1 - w, 1.7) // slows down on arrival
-  const phi = we * 11 * Math.PI * 2 // 11 strides
-  const amp = 1 - sm(seg(w, 0.84, 1)) // stride fades out at the end
-  const A = 30 * amp
-  const s = Math.sin(phi)
-  const c = Math.cos(phi)
-  const r = sm(seg(p, T_WALK, T_REACH)) // reaching for the phone
-  const q = sm(seg(p, T_REACH, T_RAISE)) // phone up to the ear
-
-  // right hand target: hanging -> handset on the phone -> ear
-  const T = [lerp(lerp(REST[0], CRADLE[0], r), EAR[0], q), lerp(lerp(REST[1], CRADLE[1], r), EAR[1], q)]
-  const tau = TILT * q
-  const arm = ik(T, UA * Math.cos(tau * RAD))
-
-  // handset position / angle / cord
-  const H = [lerp(CRADLE[0], EAR[0], q), lerp(CRADLE[1], EAR[1], q)]
-  const ha = lerp(90, -6, q)
-  const rh = ha * RAD
-  const K = [
-    H[0] + MOUTH[0] * Math.cos(rh) - MOUTH[1] * Math.sin(rh),
-    H[1] + MOUTH[0] * Math.sin(rh) + MOUTH[1] * Math.cos(rh),
-  ]
-
-  const rig = {
-    '--fx': lerp(-40, 0, we),
-    '--fz': lerp(-1900, -140, we),
-    '--bob': -amp * Math.abs(s) * 5,
-    '--ty': amp * s * 5,
-    '--tz': amp * c * 1.4,
-    '--lt': -A * s,
-    '--rt': A * s,
-    '--lk': -amp * 46 * Math.max(0, -c),
-    '--rk': -amp * 46 * Math.max(0, c),
-    '--la1': lerp(A * 0.9 * s, 0, r),
-    '--la2': lerp(4, 6, r),
-    '--le': 3,
-    '--lex': lerp(12 + amp * 10 * Math.max(0, c), 8, r),
-    '--ra1': lerp(-A * 0.9 * s, 0, r) + tau,
-    '--ra2': arm.th,
-    '--re': arm.ga,
-    '--rex': lerp(12 + amp * 10 * Math.max(0, -c), 0, r) - tau,
-    '--hz2': UA * Math.sin(tau * RAD) + 4,
-    '--hy': 18 * sm(seg(p, T_WALK, 0.57)) * (1 - sm(seg(p, T_REACH, 0.72))),
-    '--hz': 6 * q,
-    '--hx': H[0],
-    '--hy2': H[1],
-    '--ha': ha,
-  }
-  const stage = {
-    '--p': p,
-    '--pan': sm(seg(p, T_REACH, 0.8)),
-    '--dolly': 60 * sm(seg(p, 0, T_WALK)),
-  }
-  return { rig, stage, cord: cordPath(JACK, K) }
-}
-
-/* ================================================================
-   Building blocks
-   Bx = a 3D box (props, table) · Pv = a pivot/joint · Sv = a flat SVG part
-   The character is flat cartoon parts hung on 3D pivots. Each part is
-   stacked a few times with slightly darker copies behind it, which
-   gives it thickness when the camera tilts.
-   ================================================================ */
-const px = (n) => `${n}px`
-
-function Bx({ w, h, d, c, x = 0, y = 0, z = 0, cls = '' }) {
-  return (
-    <div
-      className={`bx ${cls}`}
-      style={{ '--w': px(w), '--h': px(h), '--d': px(d), '--c': c, '--bx': px(x), '--by': px(y), '--bz': px(z) }}
-    >
-      <i className="f" />
-      <i className="b" />
-      <i className="l" />
-      <i className="r" />
-      <i className="t" />
-      <i className="u" />
-    </div>
-  )
-}
-
-function Pv({ x = 0, y = 0, z = 0, rx = '0deg', ry = '0deg', rz = '0deg', cls = '', children }) {
-  return (
-    <div className={`pv ${cls}`} style={{ '--x': px(x), '--y': px(y), '--z': px(z), '--rx': rx, '--ry': ry, '--rz': rz }}>
-      {children}
-    </div>
-  )
-}
-
-function Sv({ w, h, vb, x = 0, y = 0, z = 0, d = 0, cls = '', children }) {
-  const common = { width: w, height: h, viewBox: vb || `0 0 ${w} ${h}`, 'aria-hidden': 'true' }
-  const at = (zz) => ({ left: x - w / 2, top: y, transform: `translateZ(${zz}px)` })
-  return (
-    <>
-      {Array.from({ length: d }, (_, i) => (
-        <svg key={i} className={`sv sl ${cls}`} {...common} style={at(z - (d - i) * 2)}>
-          {children}
-        </svg>
-      ))}
-      <svg className={`sv ${cls}`} {...common} style={at(z)}>
-        {children}
-      </svg>
-    </>
-  )
-}
-
-function Defs() {
-  return (
-    <svg className="defs-svg" aria-hidden="true">
-      <defs>
-        <linearGradient id="g-skin" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fad0ae" />
-          <stop offset="1" stopColor="#e6a077" />
-        </linearGradient>
-        <linearGradient id="g-skin-h" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#d98f68" />
-          <stop offset="0.35" stopColor="#f7c7a4" />
-          <stop offset="0.7" stopColor="#f1b690" />
-          <stop offset="1" stopColor="#d58b64" />
-        </linearGradient>
-        <linearGradient id="g-hair" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#58402f" />
-          <stop offset="1" stopColor="#2a1c13" />
-        </linearGradient>
-        <linearGradient id="g-jk" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#d3d7e2" />
-          <stop offset="0.55" stopColor="#b3b9cb" />
-          <stop offset="1" stopColor="#98a0b8" />
-        </linearGradient>
-        <linearGradient id="g-jkd" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#929bb7" />
-          <stop offset="1" stopColor="#6f799a" />
-        </linearGradient>
-        <linearGradient id="g-tee" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#faf8f6" />
-          <stop offset="1" stopColor="#d9d3d0" />
-        </linearGradient>
-        <linearGradient id="g-pants" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#5d5d67" />
-          <stop offset="0.5" stopColor="#4a4a53" />
-          <stop offset="1" stopColor="#35353d" />
-        </linearGradient>
-        <linearGradient id="g-shoe" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#c7695a" />
-          <stop offset="1" stopColor="#7d3328" />
-        </linearGradient>
-        <linearGradient id="g-metal" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f3f5f8" />
-          <stop offset="0.5" stopColor="#b3b8c0" />
-          <stop offset="1" stopColor="#7d838c" />
-        </linearGradient>
-        <linearGradient id="g-down" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#000" stopOpacity="0" />
-          <stop offset="1" stopColor="#000" stopOpacity="0.22" />
-        </linearGradient>
-        <linearGradient id="g-up" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#000" stopOpacity="0.28" />
-          <stop offset="1" stopColor="#000" stopOpacity="0" />
-        </linearGradient>
-        <radialGradient id="g-gloss" cx="0.35" cy="0.25" r="0.8">
-          <stop offset="0" stopColor="#fff" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-    </svg>
-  )
-}
-
-/* ---------- character ---------- */
-function Head() {
-  return (
-    <Sv w={96} h={114} vb="0 -10 96 114" y={-106} d={2}>
-      <ellipse cx="8" cy="58" rx="7" ry="11" fill="url(#g-skin-h)" />
-      <ellipse cx="88" cy="58" rx="7" ry="11" fill="url(#g-skin-h)" />
-      <ellipse cx="9" cy="58" rx="3" ry="6" fill="#d98f68" opacity="0.7" />
-      <ellipse cx="87" cy="58" rx="3" ry="6" fill="#d98f68" opacity="0.7" />
-      <path
-        d="M12 54 C12 26 28 14 48 14 C68 14 84 26 84 54 C84 80 68 96 48 96 C28 96 12 80 12 54 Z"
-        fill="url(#g-skin)"
-      />
-      <path
-        d="M12 54 C12 26 28 14 48 14 C68 14 84 26 84 54 C84 80 68 96 48 96 C28 96 12 80 12 54 Z"
-        fill="url(#g-down)"
-      />
-      <ellipse cx="48" cy="94" rx="26" ry="7" fill="#c97c55" opacity="0.28" />
-      <circle cx="25" cy="75" r="8" fill="#ff8f7a" opacity="0.3" />
-      <circle cx="71" cy="75" r="8" fill="#ff8f7a" opacity="0.3" />
-      <path d="M14 36 C30 40 46 32 60 36 C72 38 80 36 84 34 L84 20 L14 20 Z" fill="#000" opacity="0.1" />
-      <g className="blink">
-        <ellipse cx="33" cy="58" rx="9.5" ry="10.5" fill="#fff" />
-        <ellipse cx="63" cy="58" rx="9.5" ry="10.5" fill="#fff" />
-        <circle cx="34" cy="59" r="6.8" fill="#6a4128" />
-        <circle cx="62" cy="59" r="6.8" fill="#6a4128" />
-        <circle cx="34" cy="59" r="5" fill="#4b2d1b" />
-        <circle cx="62" cy="59" r="5" fill="#4b2d1b" />
-        <circle cx="34" cy="59" r="3" fill="#120a06" />
-        <circle cx="62" cy="59" r="3" fill="#120a06" />
-        <circle cx="31.4" cy="55.4" r="2.5" fill="#fff" />
-        <circle cx="59.4" cy="55.4" r="2.5" fill="#fff" />
-        <circle cx="37" cy="63" r="1.2" fill="#fff" opacity="0.7" />
-        <circle cx="65" cy="63" r="1.2" fill="#fff" opacity="0.7" />
-        <path d="M23 52 Q33 46 43 51" fill="none" stroke="#2a1c13" strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M53 51 Q63 46 73 52" fill="none" stroke="#2a1c13" strokeWidth="2.4" strokeLinecap="round" />
-      </g>
-      <path d="M22 43 Q33 35 44 41" fill="none" stroke="#33231a" strokeWidth="3.8" strokeLinecap="round" />
-      <path d="M52 41 Q63 35 74 43" fill="none" stroke="#33231a" strokeWidth="3.8" strokeLinecap="round" />
-      <path d="M48 64 Q54 74 47 75" fill="none" stroke="#d58a66" strokeWidth="2.6" strokeLinecap="round" />
-      <path d="M44 76 Q48 78 52 76" fill="none" stroke="#fff" strokeOpacity="0.35" strokeWidth="2" strokeLinecap="round" />
-      <path className="smile" d="M37 82 Q48 91 59 82" fill="none" stroke="#8c3d2a" strokeWidth="3" strokeLinecap="round" />
-      <path className="smile" d="M43 86 Q48 88.5 53 86" fill="none" stroke="#c9705a" strokeWidth="2" strokeLinecap="round" />
-      <ellipse className="talk" cx="48" cy="84" rx="7" ry="5" fill="#7a2c20" />
-      <path
-        d="M9 54 C2 30 10 8 32 3 C36 -6 54 -8 60 2 C80 0 94 20 87 52 C84 44 80 36 72 30 C62 36 48 28 40 24 C30 30 20 30 15 34 C11 40 10 46 9 54 Z"
-        fill="url(#g-hair)"
-      />
-      <path d="M30 4 L36 -10 L46 2 L56 -12 L64 2 L78 -6 L76 12 Z" fill="url(#g-hair)" />
-      <path
-        d="M38 0 L40 -7 M58 -2 L60 -8 M22 12 Q30 6 40 6 M66 8 Q74 6 80 14 M44 10 Q52 4 62 8"
-        fill="none"
-        stroke="#7a5a42"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        opacity="0.8"
-      />
-    </Sv>
-  )
-}
-
-function Torso() {
-  return (
-    <Sv w={112} h={104} y={-104} d={3}>
-      <path d="M26 4 Q56 20 86 4 L90 104 L22 104 Z" fill="url(#g-tee)" />
-      <path d="M26 4 Q56 20 86 4 L90 104 L22 104 Z" fill="url(#g-down)" opacity="0.8" />
-      <path d="M38 3 Q56 22 74 3" fill="none" stroke="#cfc7c4" strokeWidth="3" />
-      <path d="M42 36 Q56 40 70 36 M44 62 Q56 66 68 62" fill="none" stroke="#c9c1be" strokeWidth="1.6" strokeLinecap="round" opacity="0.6" />
-      <path d="M18 10 Q56 -8 94 10 L90 28 Q56 12 22 28 Z" fill="url(#g-jkd)" />
-      <path d="M16 12 Q22 6 34 8 L40 14 L34 104 L6 104 Q2 56 8 24 Q10 14 16 12 Z" fill="url(#g-jk)" />
-      <path d="M96 12 Q90 6 78 8 L72 14 L78 104 L106 104 Q110 56 104 24 Q102 14 96 12 Z" fill="url(#g-jk)" />
-      <path d="M16 12 Q22 6 34 8 L40 14 L34 40 L10 40 Q8 20 16 12 Z" fill="url(#g-gloss)" />
-      <path d="M96 12 Q90 6 78 8 L72 14 L78 40 L102 40 Q104 20 96 12 Z" fill="url(#g-gloss)" />
-      <path d="M38 14 L33 104" stroke="#7d86a6" strokeWidth="4" />
-      <path d="M74 14 L79 104" stroke="#7d86a6" strokeWidth="4" />
-      <path d="M20 56 Q25 66 21 82 M92 56 Q87 66 91 82 M14 70 Q18 78 15 92" fill="none" stroke="#7d86a6" strokeWidth="2" strokeLinecap="round" opacity="0.35" />
-      {[40, 62, 84].map((y) => (
-        <g key={y}>
-          <circle cx={35.5 - (y - 40) * 0.04} cy={y} r="2.4" fill="#e2e6f0" />
-          <circle cx={35.5 - (y - 40) * 0.04} cy={y} r="2.4" fill="none" stroke="#8d95b0" strokeWidth="0.8" />
-          <circle cx={76.5 + (y - 40) * 0.04} cy={y} r="2.4" fill="#e2e6f0" />
-          <circle cx={76.5 + (y - 40) * 0.04} cy={y} r="2.4" fill="none" stroke="#8d95b0" strokeWidth="0.8" />
-        </g>
-      ))}
-      <rect x="84" y="32" width="14" height="16" rx="3" fill="none" stroke="#8189a6" strokeWidth="1.6" />
-      <path d="M84 36 H98" stroke="#8189a6" strokeWidth="1.2" />
-      <rect x="5" y="98" width="102" height="6" rx="3" fill="#7d86a6" opacity="0.45" />
-    </Sv>
-  )
-}
-
-function Arm({ s }) {
-  const x = s === 'l' ? -50 : 50
-  return (
-    <Pv x={x} y={-88} z={8} cls={`arm ${s}`} rx={`calc(var(--${s}a1) * 1deg)`} rz={`calc(var(--${s}a2) * 1deg)`}>
-      <div className="wv">
-        <div className="wv2">
-          <Sv w={36} h={70} y={-4} d={2}>
-            <rect x="3" y="0" width="30" height="66" rx="15" fill="url(#g-jk)" />
-            <rect x="3" y="0" width="30" height="66" rx="15" fill="url(#g-gloss)" />
-            <path d="M9 14 Q12 26 9 38" fill="none" stroke="#7d86a6" strokeWidth="2" strokeLinecap="round" opacity="0.35" />
-            <rect x="1" y="46" width="34" height="18" rx="8" fill="#a8afc4" />
-            <rect x="1" y="46" width="34" height="18" rx="8" fill="url(#g-down)" />
-            <path d="M3 52 H33" stroke="#7d86a6" strokeWidth="2" />
-          </Sv>
-          <Pv y={64} rx={`calc(var(--${s}ex) * 1deg)`}>
-            <Pv rz={`calc(var(--${s}e) * 1deg)`}>
-              <Sv w={28} h={76} d={2}>
-                <rect x="3" y="0" width="22" height="60" rx="11" fill="url(#g-skin-h)" />
-                <path d="M2 54 Q2 75 14 75 Q26 75 26 54 Q26 49 14 49 Q2 49 2 54 Z" fill="url(#g-skin-h)" />
-                <path d="M9 64 V72 M14 66 V74 M19 64 V72" stroke="#c98259" strokeWidth="1.4" strokeLinecap="round" />
-                <ellipse cx="24" cy="60" rx="4" ry="7" fill="#eba97f" />
-              </Sv>
-            </Pv>
-          </Pv>
-        </div>
-      </div>
-    </Pv>
-  )
-}
-
-function Leg({ s }) {
-  const x = s === 'l' ? -22 : 22
-  return (
-    <Pv x={x} y={-144} rx={`calc(var(--${s}t) * 1deg)`} rz={s === 'l' ? '1.5deg' : '-1.5deg'}>
-      <Sv w={48} h={74} d={2}>
-        <path d="M5 8 Q5 0 14 0 H34 Q43 0 43 8 L40 74 H8 Z" fill="url(#g-pants)" />
-        <path d="M24 8 V68" stroke="#2c2c33" strokeOpacity="0.25" strokeWidth="2" />
-        <path d="M12 40 Q20 44 14 52 M36 36 Q30 42 35 50" fill="none" stroke="#2c2c33" strokeOpacity="0.3" strokeWidth="2" strokeLinecap="round" />
-      </Sv>
-      <Pv y={72} rx={`calc(var(--${s}k) * 1deg)`}>
-        <Sv w={44} h={54} d={2}>
-          <path d="M7 0 H37 L39 46 Q39 54 31 54 H13 Q5 54 5 46 Z" fill="url(#g-pants)" />
-          <rect x="5" y="40" width="34" height="9" rx="4" fill="#2f2f36" opacity="0.5" />
-        </Sv>
-        <Pv y={44} z={5}>
-          <Sv w={60} h={28} d={2}>
-            <path d="M6 7 Q6 0 30 0 Q54 0 54 7 L58 20 Q60 28 50 28 H10 Q0 28 2 20 Z" fill="url(#g-shoe)" />
-            <path d="M6 7 Q6 0 30 0 Q54 0 54 7 L58 20 Q60 28 50 28 H10 Q0 28 2 20 Z" fill="url(#g-gloss)" />
-            <rect x="1" y="21" width="58" height="7" rx="3.5" fill="#f1ebe4" />
-            <path d="M16 8 H44 M14 13 H46 M13 18 H47" stroke="#f4ece3" strokeWidth="2.4" strokeLinecap="round" />
-            <path d="M22 2 Q30 -3 38 2" fill="none" stroke="#e6ddd3" strokeWidth="3" strokeLinecap="round" />
-          </Sv>
-        </Pv>
-      </Pv>
-    </Pv>
-  )
-}
-
-function Person() {
-  return (
-    <div className="actor">
-      <div className="shadow" />
-      <div className="body">
-        <Leg s="l" />
-        <Leg s="r" />
-        <Sv w={88} h={30} y={-160} z={-2}>
-          <rect x="0" y="0" width="88" height="30" rx="12" fill="url(#g-pants)" />
-        </Sv>
-        <Pv y={-140} ry="calc(var(--ty) * 1deg)" rz="calc(var(--tz) * 1deg)">
-          <Sv w={30} h={18} y={-116} z={-1}>
-            <rect x="0" y="0" width="30" height="18" rx="7" fill="#dd9670" />
-            <rect x="0" y="0" width="30" height="18" rx="7" fill="url(#g-up)" />
-          </Sv>
-          <Torso />
-          <Arm s="l" />
-          <Arm s="r" />
-          <Pv y={-106} z={2} ry="calc(var(--hy) * 1deg)" rz="calc(var(--hz) * 1deg)" cls="head">
-            <Head />
-          </Pv>
-        </Pv>
-      </div>
-    </div>
-  )
-}
-
-/* ---------- retro rotary phone ---------- */
-function Base() {
-  const holes = Array.from({ length: 10 }, (_, i) => {
-    const a = ((35 + i * 29) * Math.PI) / 180
-    return [60 + 34 * Math.cos(a), 44 + 19 * Math.sin(a)]
-  })
-  return (
-    <Sv w={120} h={76} y={-181} d={3}>
-      <rect x="22" y="0" width="12" height="14" rx="4" fill="#7d838c" />
-      <rect x="86" y="0" width="12" height="14" rx="4" fill="#7d838c" />
-      <path
-        d="M8 76 Q2 76 6 62 L18 22 Q22 12 36 12 H84 Q98 12 102 22 L114 62 Q118 76 112 76 Z"
-        fill="url(#g-metal)"
-      />
-      <path d="M8 76 Q2 76 6 62 L18 22 Q22 12 36 12 H84 Q98 12 102 22 L114 62 Q118 76 112 76 Z" fill="url(#g-down)" />
-      <ellipse cx="60" cy="46" rx="42" ry="26" fill="#eaedf0" stroke="#9aa0a8" strokeWidth="2" />
-      <ellipse cx="60" cy="46" rx="42" ry="26" fill="url(#g-gloss)" />
-      {holes.map(([x, y], i) => (
-        <ellipse key={i} cx={x} cy={y} rx="5.5" ry="3.2" fill="#7f858d" />
-      ))}
-      <ellipse cx="60" cy="44" rx="14" ry="8" fill="#3b3e44" />
-      <ellipse cx="60" cy="42" rx="11" ry="5.5" fill="#5a5e66" />
-      <path d="M92 50 Q98 56 104 56" fill="none" stroke="#6b7078" strokeWidth="3" strokeLinecap="round" />
-    </Sv>
-  )
-}
-
-function Handset() {
-  return (
-    <Sv w={34} h={105} vb="0 0 40 124" x={-7.6} y={-52.5} d={2}>
-      <path d="M20 24 Q39 62 20 100" fill="none" stroke="url(#g-metal)" strokeWidth="17" strokeLinecap="round" />
-      <path d="M17 28 Q33 62 17 96" fill="none" stroke="#fff" strokeOpacity="0.5" strokeWidth="3" strokeLinecap="round" />
-      <ellipse cx="20" cy="14" rx="19" ry="13" fill="url(#g-metal)" />
-      <ellipse cx="20" cy="14" rx="12" ry="8" fill="#8d939b" />
-      <ellipse cx="20" cy="110" rx="19" ry="13" fill="url(#g-metal)" />
-      <ellipse cx="20" cy="110" rx="12" ry="8" fill="#8d939b" />
-      {[-5, 0, 5].map((dx) => (
-        <g key={dx}>
-          <circle cx={20 + dx} cy="14" r="1.4" fill="#4b5058" />
-          <circle cx={20 + dx} cy="110" r="1.4" fill="#4b5058" />
-        </g>
-      ))}
-    </Sv>
-  )
-}
-
-function Pedestal() {
-  return (
-    <Pv x={PED_X} y={0} z={-140} cls="ped-grp">
-      <div className="ped-glow" />
-      <i className="wave" style={{ '--dl': '0s' }} />
-      <i className="wave" style={{ '--dl': '0.7s' }} />
-      <i className="wave" style={{ '--dl': '1.4s' }} />
-      <Bx w={90} h={105} d={90} c="#e6e5e0" y={-105} cls="ped" />
-      <Base />
-    </Pv>
-  )
-}
-
-const PROPS = [
-  { t: 'ring', x: -520, y: -430, z: -900, s: 190, k: 1, d: 11 },
-  { t: 'cube', x: 380, y: -540, z: -1200, s: 48, k: 2, d: 14, c: '#c8ff2e' },
-  { t: 'ring', x: 660, y: -250, z: -1500, s: 270, k: 3, d: 16 },
-  { t: 'cube', x: -720, y: -190, z: -1700, s: 66, k: 2, d: 18, c: '#e2e1dc' },
-  { t: 'cube', x: -260, y: -610, z: -520, s: 30, k: 3, d: 10, c: '#c8ff2e' },
-  { t: 'ring', x: 290, y: -650, z: -300, s: 110, k: 2, d: 9 },
-  { t: 'cube', x: 560, y: -330, z: -300, s: 26, k: 1, d: 12, c: '#e2e1dc' },
-]
-
-/* ================================================================
-   Page
-   ================================================================ */
 export default function Contact() {
-  const ref = useReveal()
   const sceneRef = useRef(null)
-  const stageRef = useRef(null)
-  const rigRef = useRef(null)
-  const barRef = useRef(null)
-  const cordA = useRef(null)
-  const cordB = useRef(null)
+  const objRef = useRef(null)
+  const envRef = useRef(null)
+  const letterRef = useRef(null)
+  const timers = useRef([])
 
+  const [open, setOpen] = useState(false)
   const [f, setF] = useState({ name: '', email: '', topic: 'Order', message: '' })
   const [err, setErr] = useState({})
+  const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
-  const [open, setOpen] = useState(0)
-  const [phase, setPhase] = useState('walk')
+  const [copied, setCopied] = useState(false)
+  const [closing, setClosing] = useState(false)
 
-  const live = phase === 'call'
+  useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  const later = (fn, ms) => timers.current.push(setTimeout(fn, ms))
+
+  // The letter starts small enough to sit inside the envelope. Measure once and on resize.
+  useEffect(() => {
+    const measure = () => {
+      const S = sceneRef.current
+      const E = envRef.current
+      const L = letterRef.current
+      if (!S || !E || !L) return
+      const H = E.offsetHeight
+      const W = E.offsetWidth
+      const hl = L.offsetHeight || 1
+      const wl = L.offsetWidth || 1
+      S.style.setProperty('--s0', Math.min(0.62, (H * 0.84) / hl, (W * 0.9) / wl).toFixed(3))
+      S.style.setProperty('--rise', `${(-H * 0.62).toFixed(0)}px`)
+      // desktop: the letter settles lower, so it keeps clear of the header
+      const k = window.matchMedia('(min-width: 981px)').matches ? 0.232 : 0.08
+      S.style.setProperty('--dock', `${(H * k).toFixed(0)}px`)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
+  const onMove = (e) => {
+    if (open) return
+    const o = objRef.current
+    if (!o) return
+    const r = e.currentTarget.getBoundingClientRect()
+    const x = (e.clientX - r.left) / r.width - 0.5
+    const y = (e.clientY - r.top) / r.height - 0.5
+    o.style.setProperty('--my', `${(x * 12).toFixed(2)}deg`)
+    o.style.setProperty('--mx', `${(-y * 8).toFixed(2)}deg`)
+  }
+  const onLeave = () => {
+    const o = objRef.current
+    if (!o) return
+    o.style.setProperty('--my', '0deg')
+    o.style.setProperty('--mx', '0deg')
+  }
+
+  const openIt = () => {
+    onLeave()
+    setOpen(true)
+  }
+
+  // fade the letter out, then let it slide back in and close the flap
+  const closeIt = () => {
+    if (closing) return
+    setClosing(true)
+    later(() => {
+      setOpen(false)
+      setClosing(false)
+    }, 280)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeIt()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, closing])
+
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
 
   const submit = (e) => {
     e.preventDefault()
+    if (busy) return
     const er = {}
     if (!f.name.trim()) er.name = 'Please add your name'
     if (!/^\S+@\S+\.\S+$/.test(f.email)) er.email = 'Enter a valid email'
     if (f.message.trim().length < 5) er.message = 'Write a few words'
     setErr(er)
-    if (Object.keys(er).length === 0) setSent(true)
+    if (Object.keys(er).length) return
+    setBusy(true)
+    later(() => {
+      setBusy(false)
+      setSent(true)
+    }, 900)
   }
 
   const reset = () => {
@@ -565,267 +169,544 @@ export default function Contact() {
     setSent(false)
   }
 
-  // scroll position of the tall section -> 0..1 -> pose of the character
-  useEffect(() => {
-    const root = sceneRef.current
-    const stage = stageRef.current
-    const rig = rigRef.current
-    const bar = barRef.current
-    const ca = cordA.current
-    const cb = cordB.current
-    const page = root && root.closest('.page')
-    if (!root || !stage || !rig || !bar || !ca || !cb || !page) return
-
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    let target = reduce ? 1 : 0
-    let cur = target
-    let raf = 0
-    let ph = ''
-    let head = 0
-
-    const apply = (p) => {
-      const { rig: rv, stage: sv, cord } = poseFor(p)
-      for (const k in rv) rig.style.setProperty(k, rv[k].toFixed(3))
-      for (const k in sv) stage.style.setProperty(k, sv[k].toFixed(4))
-      ca.setAttribute('d', cord)
-      cb.setAttribute('d', cord)
-      bar.style.transform = `scaleX(${p.toFixed(3)})`
-      const next = phaseOf(p)
-      if (next !== ph) {
-        ph = next
-        setPhase(next)
-      }
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(EMAIL)
+    } catch {
+      /* clipboard may be blocked; the label still confirms the click */
     }
-
-    const tick = () => {
-      raf = 0
-      const d = target - cur
-      cur = Math.abs(d) < 0.0004 ? target : cur + d * 0.14
-      apply(cur)
-      if (cur !== target) raf = requestAnimationFrame(tick)
-    }
-    const kick = () => {
-      if (!raf) raf = requestAnimationFrame(tick)
-    }
-    const read = () => {
-      const s = root.getBoundingClientRect()
-      const pr = page.getBoundingClientRect()
-      const total = Math.max(1, s.height - stage.offsetHeight)
-      target = clamp((pr.top + head - s.top) / total)
-      kick()
-    }
-    const size = () => {
-      const h = stage.clientHeight
-      const w = stage.clientWidth
-      head = stickTop(page, stage)
-      stage.style.setProperty('--fs', clamp(Math.min(h / 500, w / 700), 0.7, 1.8).toFixed(3))
-      if (!reduce) read()
-    }
-
-    size()
-    apply(cur)
-    if (reduce) return
-
-    page.addEventListener('scroll', read, { passive: true })
-    window.addEventListener('resize', size)
-    return () => {
-      page.removeEventListener('scroll', read)
-      window.removeEventListener('resize', size)
-      if (raf) cancelAnimationFrame(raf)
-    }
-  }, [])
-
-  const skip = () => {
-    const root = sceneRef.current
-    const stage = stageRef.current
-    const page = root && root.closest('.page')
-    if (!page || !stage) return
-    const s = root.getBoundingClientRect()
-    const pr = page.getBoundingClientRect()
-    const head = stickTop(page, stage)
-    const total = s.height - stage.offsetHeight
-    page.scrollTo({ top: page.scrollTop + (s.top - pr.top - head) + total * 0.86, behavior: 'smooth' })
+    setCopied(true)
+    later(() => setCopied(false), 1600)
   }
 
+  let n = 0
+
   return (
-    <div ref={ref} className="pg contact">
-      <header className="pg-hero">
-        <p className="eyebrow">Get in touch</p>
-        <Title3D text="Say Hello" />
-        <p className="lede">
-          Scroll down. Someone is walking over to answer the phone, and the message form drops in the moment they pick up.
-          (It is a demo, so nothing leaves your browser.)
-        </p>
-      </header>
+    <div className="pg contact">
+      {/* ---------- backdrop: blurred leaves, light rays, thin arc ---------- */}
+      <div className="kc-bg" aria-hidden="true">
+        <svg viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <filter id="kcb-b1" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="10" />
+            </filter>
+            <filter id="kcb-b2" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="22" />
+            </filter>
+            <linearGradient id="kcb-ray" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stopColor="#fff" stopOpacity=".75" />
+              <stop offset="1" stopColor="#fff" stopOpacity="0" />
+            </linearGradient>
+            <path id="kcb-leaf" d="M0 0 C40 -44 120 -60 190 -16 C132 30 54 40 0 0Z" />
+          </defs>
+          <g filter="url(#kcb-b2)" opacity=".8">
+            <polygon points="330,941 520,941 780,620 700,620" fill="url(#kcb-ray)" />
+            <polygon points="560,941 700,941 930,690 870,690" fill="url(#kcb-ray)" />
+            <polygon points="900,941 1040,941 1180,760 1120,760" fill="url(#kcb-ray)" opacity=".6" />
+          </g>
+          <g filter="url(#kcb-b1)">
+            <use href="#kcb-leaf" transform="translate(-30 250) rotate(18) scale(1.1)" fill="#2e4a17" opacity=".85" />
+            <use href="#kcb-leaf" transform="translate(-40 305) rotate(-14) scale(.9)" fill="#3f6a1f" opacity=".7" />
+            <use href="#kcb-leaf" transform="translate(-34 470) rotate(-8) scale(.8)" fill="#6f9a2c" opacity=".55" />
+            <use href="#kcb-leaf" transform="translate(-24 905) rotate(-30) scale(1.4)" fill="#2b4416" opacity=".8" />
+            <use href="#kcb-leaf" transform="translate(26 965) rotate(-62) scale(1.3)" fill="#3f6a1f" opacity=".7" />
+            <use href="#kcb-leaf" transform="translate(1710 560) rotate(200) scale(1.5)" fill="#2e4a17" opacity=".85" />
+            <use href="#kcb-leaf" transform="translate(1706 655) rotate(168) scale(1.2)" fill="#4c7a22" opacity=".6" />
+            <use href="#kcb-leaf" transform="translate(1694 905) rotate(216) scale(1.7)" fill="#2b4416" opacity=".85" />
+            <use href="#kcb-leaf" transform="translate(1722 120) rotate(160) scale(.9)" fill="#6f9a2c" opacity=".35" />
+          </g>
+          <circle cx="-92" cy="800" r="152" fill="none" stroke="#141412" strokeOpacity=".55" strokeWidth="1" />
+        </svg>
+      </div>
 
-      <section ref={sceneRef} className="ct-scene" aria-label="Contact">
-        <div ref={stageRef} className={`ct-stage ${sent ? 'sent' : ''}`} data-phase={phase}>
-          <Defs />
-          <div className="world">
-            <div className="floor" />
-            <div className="pool" />
-            <div className="back-word" aria-hidden="true">
-              HELLO
-            </div>
-
-            {PROPS.map((o, i) => (
-              <div key={i} className="prop" style={{ '--px': o.x, '--py': o.y, '--pz': o.z, '--k': o.k }}>
-                {o.t === 'ring' ? (
-                  <div
-                    className="p-ring"
-                    style={{ width: o.s, height: o.s, margin: `${-o.s / 2}px 0 0 ${-o.s / 2}px`, animationDuration: `${o.d}s` }}
-                  />
-                ) : (
-                  <div className="spin" style={{ animationDuration: `${o.d}s` }}>
-                    <Bx w={o.s} h={o.s} d={o.s} c={o.c} y={-o.s / 2} />
-                  </div>
-                )}
-              </div>
-            ))}
-
-            <div ref={rigRef} className="rig">
-              <Pedestal />
-              <Person />
-
-              <Pv z={-136} cls="cord-layer">
-                <svg className="cord" width="700" height="430" viewBox="-250 -380 700 430" style={{ left: -250, top: -380 }} aria-hidden="true">
-                  <path ref={cordA} fill="none" stroke="#5f646c" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
-                  <path ref={cordB} fill="none" stroke="#b9bec6" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </Pv>
-
-              <Pv z={-132} cls="hs-layer">
-                <div className="hs">
-                  <div className="hs-shake">
-                    <Handset />
-                    <i className="flash" />
-                  </div>
-                </div>
-              </Pv>
-            </div>
-          </div>
-
-          <div className="ct-tag">
-            <i className="ct-dot" />
-            <span>{PHASE_TEXT[sent ? 'call' : phase]}</span>
-          </div>
-
-          <button type="button" className="ct-skip" onClick={skip} tabIndex={live ? -1 : 0}>
-            Skip intro <span aria-hidden="true">→</span>
-          </button>
-
-          <div className="ct-hud" aria-hidden="true">
-            <ol>
-              {PHASES.map(([k, l], i) => (
-                <li key={k} className={PHASES.findIndex(([x]) => x === phase) >= i ? 'on' : ''}>
-                  <small>0{i + 1}</small> {l}
-                </li>
-              ))}
-            </ol>
-            <div className="ct-bar">
-              <i ref={barRef} />
-            </div>
-          </div>
-
-          <p className="ct-cue" aria-hidden="true">
-            Scroll · watch who is coming
+      <section className="kc-stage">
+        {/* ---------- left column ---------- */}
+        <div className="kc-copy-col">
+          <p className="kc-eyebrow">
+            <span>Get in touch</span>
+            <i className="kc-dot" aria-hidden="true" />
+            <i className="kc-rule" aria-hidden="true" />
           </p>
 
-          <div className={`ct-drop ${live ? 'live' : ''}`} aria-hidden={!live} inert={live ? undefined : ''}>
-            <div className={`flip ${sent ? 'sent' : ''}`}>
-              <div className="flip-inner">
-                <form className="flip-face flip-front" onSubmit={submit} noValidate>
-                  <h2>Send a message</h2>
+          <h1 className="kc-title" aria-label="Say Hello">
+            <span className="kc-word" aria-hidden="true">
+              {SAY.map(([ch, t]) => (
+                <span key={n} className="kc-ch" style={{ '--i': n++, '--c': tone(t) }}>
+                  {ch}
+                </span>
+              ))}
+            </span>
+            <span className="kc-word" aria-hidden="true">
+              {HELL.map(([ch, t]) => (
+                <span key={n} className="kc-ch" style={{ '--i': n++, '--c': tone(t) }}>
+                  {ch}
+                </span>
+              ))}
+              <span className="kc-o" style={{ '--i': n }}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C8 11 11 8 12 0Z" fill="#fff" />
+                </svg>
+              </span>
+            </span>
+          </h1>
 
-                  <label className={`field ${err.name ? 'err' : ''}`}>
-                    <span>Name</span>
-                    <input value={f.name} onChange={set('name')} autoComplete="name" />
-                    {err.name && <em>{err.name}</em>}
-                  </label>
+          <p className="kc-lede">
+            Questions about sizing, an order or a collaboration?
+            <br />
+            Open the envelope and write us a few lines.
+          </p>
+          <p className="kc-lede kc-demo">(This is a demo, so nothing leaves your browser.)</p>
 
-                  <label className={`field ${err.email ? 'err' : ''}`}>
-                    <span>Email</span>
-                    <input value={f.email} onChange={set('email')} type="email" autoComplete="email" />
-                    {err.email && <em>{err.email}</em>}
-                  </label>
-
-                  <div className="field">
-                    <span>Topic</span>
-                    <div className="chips" role="group" aria-label="Topic">
-                      {TOPICS.map((x) => (
-                        <button
-                          key={x}
-                          type="button"
-                          className={f.topic === x ? 'on' : ''}
-                          onClick={() => setF((s) => ({ ...s, topic: x }))}
-                        >
-                          {x}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <label className={`field ${err.message ? 'err' : ''}`}>
-                    <span>Message</span>
-                    <textarea rows="3" value={f.message} onChange={set('message')} />
-                    {err.message && <em>{err.message}</em>}
-                  </label>
-
-                  <button type="submit" className="send">
-                    <span>Send message</span>
-                  </button>
-                </form>
-
-                <div className="flip-face flip-back" aria-hidden={!sent}>
-                  <b>Thanks, {f.name.split(' ')[0] || 'friend'}.</b>
-                  <p>
-                    Your message about “{f.topic.toLowerCase()}” would be on its way. This is a demo, so nothing was
-                    actually sent.
-                  </p>
-                  <button type="button" className="send" onClick={reset} tabIndex={sent ? 0 : -1}>
-                    <span>Write another</span>
-                  </button>
-                </div>
+          <ul className="kc-info">
+            <li>
+              <span className="kc-ic">
+                <Icon>
+                  <rect x="3" y="5" width="18" height="14" rx="3" />
+                  <path d="M3.8 7.6 12 13.2l8.2-5.6" />
+                </Icon>
+              </span>
+              <div>
+                <span className="kc-lab">Email</span>
+                <b>{EMAIL}</b>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="info-row">
-        {INFO.map(([k, v], i) => (
-          <div key={k} className="tile" data-reveal style={{ '--d': i }} {...t}>
-            <div className="tile-in">
-              <span className="eyebrow">{k}</span>
-              <b>{v}</b>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <section className="faq">
-        <div className="sec-head" data-reveal>
-          <p className="eyebrow">FAQ</p>
-          <h2>Quick answers.</h2>
-        </div>
-        <div className="faq-list">
-          {FAQ.map(([q, a], i) => (
-            <div key={q} className={`faq-item ${open === i ? 'open' : ''}`} data-reveal style={{ '--d': i }}>
-              <button type="button" onClick={() => setOpen(open === i ? -1 : i)} aria-expanded={open === i}>
-                <span>{q}</span>
-                <i aria-hidden="true" />
+              <button type="button" className="kc-copy" onClick={copy}>
+                <Icon>
+                  <rect x="9" y="9" width="11" height="11" rx="2.2" />
+                  <path d="M5 15V6.4A2.4 2.4 0 0 1 7.4 4H15" />
+                </Icon>
+                <span>{copied ? 'Copied ✓' : 'Copy'}</span>
               </button>
-              <div className="faq-a">
-                <div>
-                  <p>{a}</p>
-                </div>
+            </li>
+            <li>
+              <span className="kc-ic">
+                <Icon>
+                  <path d="M4.5 9 6 4h12l1.5 5" />
+                  <path d="M4 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0" />
+                  <path d="M5 11.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7.5" />
+                  <rect x="9" y="14" width="6" height="6" rx=".8" />
+                </Icon>
+              </span>
+              <div>
+                <span className="kc-lab">Studio</span>
+                <b>Unit 12, Sample Street</b>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            </li>
+            <li>
+              <span className="kc-ic">
+                <Icon>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5.2l3.2 2" />
+                </Icon>
+              </span>
+              <div>
+                <span className="kc-lab">Hours</span>
+                <b>Mon – Fri, 10:00 – 18:00</b>
+              </div>
+            </li>
+          </ul>
 
-      <Footer />
+          <button
+            type="button"
+            className={`kc-cta ${open ? 'is-gone' : ''}`}
+            onClick={openIt}
+            tabIndex={open ? -1 : 0}
+            aria-hidden={open}
+          >
+            <span>Open the envelope</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 12h16M14 6l6 6-6 6" />
+            </svg>
+          </button>
+
+          <p className="kc-sign">
+            <span>We reply soon</span>
+            <b aria-hidden="true">·</b>
+            <span>Fancy Clothes team</span>
+          </p>
+        </div>
+
+        {/* ---------- right: the envelope scene ---------- */}
+        <div className="kc-scene-wrap">
+          <div ref={sceneRef} className={`kc-scene ${open ? 'open' : ''} ${closing ? 'closing' : ''}`} onPointerMove={onMove} onPointerLeave={onLeave}>
+            {/* back layer: glow, podium, back half of the ring, floating pieces */}
+            <svg className="kc-layer kc-back" viewBox="0 0 872 841" aria-hidden="true">
+              <defs>
+                <radialGradient id="kcg-glow" cx=".5" cy=".5" r=".5">
+                  <stop offset="0" stopColor="#d6ff3a" stopOpacity=".6" />
+                  <stop offset="1" stopColor="#d6ff3a" stopOpacity="0" />
+                </radialGradient>
+                <linearGradient id="kcg-top" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#f4f1e8" />
+                  <stop offset=".55" stopColor="#e0dacb" />
+                  <stop offset="1" stopColor="#c9c2b0" />
+                </linearGradient>
+                <linearGradient id="kcg-side" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stopColor="#b3ab97" />
+                  <stop offset=".3" stopColor="#e4dfd2" />
+                  <stop offset=".68" stopColor="#cfc8b6" />
+                  <stop offset="1" stopColor="#9e9682" />
+                </linearGradient>
+                <linearGradient id="kcg-ring" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stopColor="#c8ff2e" />
+                  <stop offset=".5" stopColor="#f6ffd0" />
+                  <stop offset="1" stopColor="#b4e81a" />
+                </linearGradient>
+                <linearGradient id="kcg-bag" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#2b2b27" />
+                  <stop offset="1" stopColor="#10100e" />
+                </linearGradient>
+                <linearGradient id="kcg-skirt" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#fffaf0" />
+                  <stop offset="1" stopColor="#e4d6b8" />
+                </linearGradient>
+                <clipPath id="kcg-up">
+                  <rect x="0" y="0" width="872" height="400" />
+                </clipPath>
+                <clipPath id="kcg-dn">
+                  <rect x="0" y="400" width="872" height="441" />
+                </clipPath>
+                <clipPath id="kcg-topclip">
+                  <ellipse cx="388" cy="672" rx="308" ry="50" />
+                </clipPath>
+                <filter id="kcg-blur" x="-30%" y="-60%" width="160%" height="220%">
+                  <feGaussianBlur stdDeviation="6" />
+                </filter>
+                <filter id="kcg-blur-lg" x="-30%" y="-80%" width="160%" height="260%">
+                  <feGaussianBlur stdDeviation="16" />
+                </filter>
+              </defs>
+
+              {/* lime light on the floor */}
+              <ellipse cx="392" cy="728" rx="390" ry="70" fill="url(#kcg-glow)" filter="url(#kcg-blur-lg)" />
+
+              {/* marble podium */}
+              <ellipse cx="388" cy="718" rx="324" ry="56" fill="none" stroke="#d9ff4a" strokeWidth="7" opacity=".75" filter="url(#kcg-blur)" />
+              <path d="M80 672 L80 712 A308 50 0 0 0 696 712 L696 672 Z" fill="url(#kcg-side)" />
+              <path d="M80 700 A308 50 0 0 0 696 700" fill="none" stroke="#fff" strokeOpacity=".28" strokeWidth="6" />
+              <ellipse cx="388" cy="672" rx="308" ry="50" fill="url(#kcg-top)" />
+              <g clipPath="url(#kcg-topclip)" fill="none" strokeLinecap="round">
+                <path d="M120 660 C190 648 215 690 290 672 S380 640 440 668" stroke="#b79a52" strokeOpacity=".55" strokeWidth="1.4" />
+                <path d="M520 646 C560 660 590 690 650 676" stroke="#b79a52" strokeOpacity=".5" strokeWidth="1.2" />
+                <path d="M230 690 C270 700 310 712 360 700" stroke="#8d887b" strokeOpacity=".45" strokeWidth="1" />
+                <path d="M470 700 C520 692 560 700 600 692" stroke="#8d887b" strokeOpacity=".4" strokeWidth="1" />
+                <path d="M300 648 C320 660 340 656 356 668" stroke="#d3b45e" strokeOpacity=".55" strokeWidth="1.6" />
+              </g>
+              <ellipse cx="388" cy="672" rx="308" ry="50" fill="none" stroke="#fff" strokeOpacity=".75" strokeWidth="1.6" />
+              <path d="M80 712 A308 50 0 0 0 696 712" fill="none" stroke="#d6ff3a" strokeWidth="3" strokeOpacity=".9" />
+              <ellipse cx="420" cy="676" rx="200" ry="26" fill="url(#kcg-glow)" />
+
+              {/* ring: the half behind the envelope */}
+              <g transform={`rotate(${RING.rot} ${RING.cx} ${RING.cy})`}>
+                <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="#c8ff2e" strokeWidth="16" opacity=".32" filter="url(#kcg-blur)" clipPath="url(#kcg-up)" />
+                <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="url(#kcg-ring)" strokeWidth="6.5" strokeOpacity=".9" clipPath="url(#kcg-up)" />
+                <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="#fff" strokeWidth="1.4" strokeOpacity=".85" clipPath="url(#kcg-up)" />
+              </g>
+
+              {/* (animated pieces live in their own svg, so the blur filters above are not repainted every frame) */}
+            </svg>
+            <svg className="kc-layer kc-back" viewBox="0 0 872 841" aria-hidden="true">
+              {/* dashed flight path + paper plane */}
+              <g className="kc-fade">
+                <path d="M77 302 C66 214 118 168 232 138" fill="none" stroke="#a9d400" strokeWidth="2.2" strokeDasharray="7 8" strokeLinecap="round" />
+                <g className="kc-fl" style={{ '--d': '-1s' }}>
+                  <path d="M222 108 L313 93 L270 128 Z" fill="#fff" stroke="#e3dfd2" strokeWidth="1" strokeLinejoin="round" />
+                  <path d="M270 128 L313 93 L282 149 Z" fill="#d8d4c7" />
+                  <path d="M222 108 L270 128 L261 142 Z" fill="#ebe8dd" />
+                </g>
+              </g>
+
+              {/* shopping bag */}
+              <g className="kc-fade" transform="translate(416 192) rotate(9)">
+                <g className="kc-fl" style={{ '--d': '-2.2s' }}>
+                  <path d="M-24 -36 C-27 -84 27 -84 24 -36" fill="none" stroke="#1a1a17" strokeWidth="4.5" strokeLinecap="round" />
+                  <path d="M-12 -36 C-13 -68 15 -68 13 -36" fill="none" stroke="#33332e" strokeWidth="3" strokeLinecap="round" />
+                  <path d="M50 -36 L70 -28 L62 56 L42 64 Z" fill="#20201d" />
+                  <path d="M-50 -36 L50 -36 L42 64 L-42 64 Z" fill="url(#kcg-bag)" />
+                  <path d="M-50 -36 L50 -36" stroke="#45453f" strokeWidth="1.4" />
+                  <text x="0" y="13" textAnchor="middle" fontSize="11.5" fontWeight="800" fill="#e2e0d3" letterSpacing="1.2" fontFamily="'Archivo Black', Arial, sans-serif">
+                    FANCY
+                  </text>
+                  <text x="0" y="27" textAnchor="middle" fontSize="11.5" fontWeight="800" fill="#e2e0d3" letterSpacing="1.2" fontFamily="'Archivo Black', Arial, sans-serif">
+                    CLOTHES
+                  </text>
+                </g>
+              </g>
+
+              {/* dress on a stand */}
+              <g className="kc-fade" transform="translate(618 176)">
+                <g className="kc-fl" style={{ '--d': '-3.4s' }}>
+                  <rect x="-1.6" y="108" width="3.2" height="32" fill="#c9b27a" />
+                  <ellipse cx="0" cy="142" rx="13" ry="3.6" fill="#cdb98a" />
+                  <path d="M-12 44 C-44 58 -58 92 -54 110 C-22 121 22 121 54 110 C58 92 44 58 12 44 Z" fill="url(#kcg-skirt)" />
+                  <path d="M-16 58 C-22 80 -26 98 -28 114 M0 52 C0 76 0 98 0 118 M16 58 C22 80 26 98 28 114" fill="none" stroke="#d6c7a2" strokeOpacity=".75" strokeWidth=".9" />
+                  <path d="M-13 8 L13 8 L12 26 L11 46 L-11 46 L-12 26 Z" fill="#f6eedd" />
+                  <ellipse cx="-16" cy="13" rx="7" ry="8" fill="#f6eedd" />
+                  <ellipse cx="16" cy="13" rx="7" ry="8" fill="#f6eedd" />
+                  <path d="M-6 8 L0 21 L6 8" fill="#ecdfc4" stroke="#dccda9" strokeWidth=".8" />
+                  <path d="M-11 44 L11 44" stroke="#dfd0ac" strokeWidth="2" />
+                  <ellipse cx="0" cy="2" rx="5" ry="6" fill="#eadcc2" />
+                </g>
+              </g>
+            </svg>
+
+            {/* handwritten note */}
+            <div className="kc-script kc-fade" aria-hidden="true">
+              <span>Let&rsquo;s</span>
+              <span>Create Something</span>
+              <span>Amazing Together</span>
+              <svg viewBox="0 0 50 56" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M24 50 C6 34 6 14 17 10 C22 8 25 12 25 17 C26 11 33 6 39 11 C46 18 38 34 24 50 Z" />
+                <path d="M30 12 C38 4 44 6 46 12" />
+              </svg>
+            </div>
+
+            {/* the envelope (this is the part that opens) */}
+            <div ref={objRef} className="kc-obj">
+              <div ref={envRef} className="kc-env">
+                {/* inside of the envelope */}
+                <div className="kc-lining" />
+
+                {/* the letter = the form */}
+                <div ref={letterRef} className="kc-letter">
+                  <div className="kc-rules" aria-hidden="true" />
+                  <button type="button" className="kc-x" onClick={closeIt} aria-label="Close the letter" tabIndex={open ? 0 : -1}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                  <div className="kc-letter-in" aria-hidden={!open} inert={open ? undefined : ''}>
+                    {sent ? (
+                      <div className="kc-done" role="status">
+                        <svg width="64" height="64" viewBox="0 0 76 76" aria-hidden="true">
+                          <circle className="kc-ring" cx="38" cy="38" r="34" fill="none" strokeWidth="3" />
+                          <path className="kc-tick" d="M23 39l11 11 20-23" fill="none" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <h2>Thanks, {f.name.trim().split(' ')[0] || 'friend'}.</h2>
+                        <p>
+                          Your message about “{f.topic.toLowerCase()}” would be on its way. This is a demo, so nothing was
+                          actually sent.
+                        </p>
+                        <button type="button" className="kc-send" onClick={reset}>
+                          <span>Write another</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <form onSubmit={submit} noValidate>
+                        <h2 className="kc-h">Dear Fancy Clothes,</h2>
+
+                        <label className={`kc-field ${err.name ? 'err' : ''}`}>
+                          <span>Name</span>
+                          <input value={f.name} onChange={set('name')} autoComplete="name" />
+                          {err.name && <em>{err.name}</em>}
+                        </label>
+
+                        <label className={`kc-field ${err.email ? 'err' : ''}`}>
+                          <span>Email</span>
+                          <input value={f.email} onChange={set('email')} type="email" autoComplete="email" />
+                          {err.email && <em>{err.email}</em>}
+                        </label>
+
+                        <div className="kc-field">
+                          <span>Topic</span>
+                          <div className="kc-chips" role="group" aria-label="Topic">
+                            {TOPICS.map((x) => (
+                              <button
+                                key={x}
+                                type="button"
+                                className={f.topic === x ? 'on' : ''}
+                                aria-pressed={f.topic === x}
+                                onClick={() => setF((s) => ({ ...s, topic: x }))}
+                              >
+                                {x}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <label className={`kc-field ${err.message ? 'err' : ''}`}>
+                          <span>
+                            Message <small>{f.message.length}/400</small>
+                          </span>
+                          <textarea rows="3" maxLength={400} value={f.message} onChange={set('message')} />
+                          {err.message && <em>{err.message}</em>}
+                        </label>
+
+                        <button type="submit" className="kc-send" disabled={busy}>
+                          <span>{busy ? 'Sending…' : 'Send letter'}</span>
+                          <i aria-hidden="true">→</i>
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+
+                {/* front pocket: the V-shaped front of the envelope */}
+                <svg className="kc-front" viewBox="0 0 440 264" preserveAspectRatio="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="kc-gf" x1="0" y1="0" x2="0.35" y2="1">
+                      <stop offset="0" stopColor="#2a2a26" />
+                      <stop offset=".6" stopColor="#151513" />
+                      <stop offset="1" stopColor="#0c0c0a" />
+                    </linearGradient>
+                    <linearGradient id="kc-rim" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stopColor="#c8ff2e" stopOpacity="0" />
+                      <stop offset="1" stopColor="#c8ff2e" stopOpacity=".34" />
+                    </linearGradient>
+                    <linearGradient id="kc-gold" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0" stopColor="#e6c36a" stopOpacity=".95" />
+                      <stop offset=".5" stopColor="#b88a35" stopOpacity=".7" />
+                      <stop offset="1" stopColor="#e6c36a" stopOpacity=".9" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M0 0 L220 146 L440 0 L440 264 L0 264 Z" fill="url(#kc-gf)" />
+                  <path d="M0 264 L205 136 M440 264 L235 136" fill="none" stroke="#ffffff22" strokeWidth="1.2" />
+                  <path d="M0 0 L220 146 L440 0" fill="none" stroke="url(#kc-gold)" strokeWidth="1.5" />
+                  <rect x="0" y="200" width="440" height="64" fill="url(#kc-rim)" />
+                  <rect x="0.6" y="0.6" width="438.8" height="262.8" fill="none" stroke="#ffffff1a" strokeWidth="1.2" />
+                </svg>
+
+                {/* flap with wax seal */}
+                <div className="kc-flap">
+                  <svg className="kc-flap-out" viewBox="0 0 440 146" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="kc-gp" x1="0" y1="0" x2="0.4" y2="1">
+                        <stop offset="0" stopColor="#1b1b18" />
+                        <stop offset="1" stopColor="#34332d" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M0 0 H440 L220 146 Z" fill="url(#kc-gp)" />
+                    <path d="M0 0 L220 146 L440 0" fill="none" stroke="url(#kc-gold)" strokeWidth="1.6" />
+                    <path d="M0 0 H440" fill="none" stroke="#ffffff1f" strokeWidth="1.2" />
+                  </svg>
+                  <svg className="kc-flap-in" viewBox="0 0 440 146" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M0 0 H440 L220 146 Z" fill="#b4e81a" />
+                    <path d="M0 0 H440 L220 146 Z" fill="none" stroke="#12121226" strokeWidth="1.2" />
+                  </svg>
+                  <span className="kc-seal" aria-hidden="true">
+                    <svg viewBox="0 0 100 100">
+                      <defs>
+                        <radialGradient id="kcs-g" cx=".36" cy=".3" r=".85">
+                          <stop offset="0" stopColor="#ecff82" />
+                          <stop offset=".45" stopColor="#c6f01f" />
+                          <stop offset="1" stopColor="#7fa300" />
+                        </radialGradient>
+                      </defs>
+                      <path d={SEAL} fill="url(#kcs-g)" />
+                      <circle cx="50" cy="50" r="35" fill="none" stroke="#6b9100" strokeOpacity=".55" strokeWidth="2.2" />
+                      <circle cx="49.2" cy="49.2" r="35" fill="none" stroke="#f4ffb8" strokeOpacity=".6" strokeWidth="1" />
+                      <text
+                        x="50"
+                        y="63"
+                        textAnchor="middle"
+                        fontFamily="'Archivo Black', Arial, sans-serif"
+                        fontSize="38"
+                        fontStyle="italic"
+                        fill="#8fb305"
+                        stroke="#f3ffa6"
+                        strokeOpacity=".75"
+                        strokeWidth=".9"
+                      >
+                        FC
+                      </text>
+                    </svg>
+                  </span>
+                </div>
+
+                {!open && <button type="button" className="kc-hit" onClick={openIt} aria-label="Open the envelope" />}
+              </div>
+              <div className="kc-shadow" aria-hidden="true" />
+            </div>
+
+            {/* front layer: front half of the ring, spheres, sneaker, sunglasses */}
+            <svg className="kc-layer kc-fore kc-fade" viewBox="0 0 872 841" aria-hidden="true">
+              <defs>
+                <radialGradient id="kcg-lime" cx=".35" cy=".3" r=".75">
+                  <stop offset="0" stopColor="#f7ffbc" />
+                  <stop offset=".35" stopColor="#cdf23a" />
+                  <stop offset=".75" stopColor="#8fb800" />
+                  <stop offset="1" stopColor="#506d00" />
+                </radialGradient>
+                <radialGradient id="kcg-silver" cx=".35" cy=".3" r=".75">
+                  <stop offset="0" stopColor="#ffffff" />
+                  <stop offset=".4" stopColor="#d6d6d2" />
+                  <stop offset=".8" stopColor="#8c8c88" />
+                  <stop offset="1" stopColor="#5e5e5a" />
+                </radialGradient>
+                <radialGradient id="kcg-bead" cx=".35" cy=".3" r=".8">
+                  <stop offset="0" stopColor="#ffffff" stopOpacity=".95" />
+                  <stop offset=".5" stopColor="#f0ffc8" stopOpacity=".4" />
+                  <stop offset="1" stopColor="#bcd878" stopOpacity=".55" />
+                </radialGradient>
+                <linearGradient id="kcg-lens" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#403f3a" />
+                  <stop offset="1" stopColor="#0c0c0a" />
+                </linearGradient>
+              </defs>
+
+              {/* ring: the half in front of the envelope */}
+              <g transform={`rotate(${RING.rot} ${RING.cx} ${RING.cy})`}>
+                <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="#c8ff2e" strokeWidth="16" opacity=".32" filter="url(#kcg-blur)" clipPath="url(#kcg-dn)" />
+                <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="url(#kcg-ring)" strokeWidth="6.5" strokeOpacity=".92" clipPath="url(#kcg-dn)" />
+                <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="#fff" strokeWidth="1.4" strokeOpacity=".9" clipPath="url(#kcg-dn)" />
+              </g>
+
+            </svg>
+            <svg className="kc-layer kc-fore kc-fade" viewBox="0 0 872 841" aria-hidden="true">
+              {/* spheres on the ring */}
+              <g className="kc-fl" style={{ '--d': '-0.6s' }}>
+                <circle cx={LX} cy={LY} r="20" fill="url(#kcg-lime)" />
+                <ellipse cx={LX - 6} cy={LY - 8} rx="6" ry="3.4" fill="#fff" opacity=".75" transform={`rotate(-30 ${LX - 6} ${LY - 8})`} />
+              </g>
+              <g className="kc-fl" style={{ '--d': '-2.8s' }}>
+                <circle cx={RX} cy={RY} r="21" fill="url(#kcg-lime)" />
+                <ellipse cx={RX - 6} cy={RY - 8} rx="6.5" ry="3.6" fill="#fff" opacity=".75" transform={`rotate(-30 ${RX - 6} ${RY - 8})`} />
+              </g>
+              <g className="kc-fl" style={{ '--d': '-1.7s' }}>
+                <circle cx={SX} cy={SY} r="17" fill="url(#kcg-silver)" />
+                <ellipse cx={SX - 5} cy={SY - 7} rx="5" ry="2.8" fill="#fff" opacity=".8" transform={`rotate(-30 ${SX - 5} ${SY - 7})`} />
+              </g>
+              <g className="kc-fl" style={{ '--d': '-3.9s' }}>
+                <circle cx={BX} cy={BY} r="18" fill="url(#kcg-bead)" stroke="#fff" strokeOpacity=".85" strokeWidth="1.4" />
+                <ellipse cx={BX - 5} cy={BY - 7} rx="5.5" ry="3" fill="#fff" opacity=".9" transform={`rotate(-30 ${BX - 5} ${BY - 7})`} />
+              </g>
+
+              {/* sneaker */}
+              <g transform="translate(14 482) rotate(10 85 60)">
+                <g className="kc-fl" style={{ '--d': '-1.4s' }}>
+                  <path d="M4 88 C4 100 14 108 30 109 L150 107 C163 106 166 96 164 88 Z" fill="#efefe8" stroke="#d3d1c4" strokeWidth="1.2" />
+                  <path d="M6 96 C40 101 120 101 163 96" fill="none" stroke="#d9d7cb" strokeWidth="1.2" />
+                  <path d="M6 88 C4 70 14 58 34 55 C52 53 62 46 72 36 L96 24 C104 20 110 22 114 28 L120 36 C132 46 150 52 160 62 C166 70 166 80 164 88 Z" fill="#ffffff" stroke="#dedbd0" strokeWidth="1.2" strokeLinejoin="round" />
+                  <path d="M96 24 C104 18 118 18 126 25 L120 36 L110 30 Z" fill="#cdcbbf" />
+                  <path d="M6 88 C4 72 12 62 28 58 L40 74 L36 88 Z" fill="#f2f1e9" />
+                  <path d="M52 86 C76 83 102 70 134 52 C116 80 88 97 52 86 Z" fill="#c8ff2e" stroke="#a8d400" strokeWidth=".8" />
+                  <path d="M76 38 L96 52 M84 34 L104 48 M92 30 L110 44" stroke="#dcd8c6" strokeWidth="2" strokeLinecap="round" />
+                </g>
+              </g>
+
+              {/* sunglasses */}
+              <g transform="translate(704 596) rotate(26)">
+                <g className="kc-fl" style={{ '--d': '-3.1s' }}>
+                  <path d="M-4 16 L-40 2" stroke="#141412" strokeWidth="5" strokeLinecap="round" />
+                  <path d="M138 16 L172 0" stroke="#141412" strokeWidth="5" strokeLinecap="round" />
+                  <path d="M62 22 C66 12 74 12 78 22" fill="none" stroke="#141412" strokeWidth="6" strokeLinecap="round" />
+                  <rect x="-2" y="6" width="66" height="48" rx="20" fill="url(#kcg-lens)" stroke="#0e0e0c" strokeWidth="5" />
+                  <rect x="76" y="6" width="66" height="48" rx="20" fill="url(#kcg-lens)" stroke="#0e0e0c" strokeWidth="5" />
+                  <path d="M10 19 C16 13 28 13 34 17" fill="none" stroke="#fff" strokeOpacity=".4" strokeWidth="2.5" strokeLinecap="round" />
+                  <path d="M88 19 C94 13 106 13 112 17" fill="none" stroke="#fff" strokeOpacity=".4" strokeWidth="2.5" strokeLinecap="round" />
+                </g>
+              </g>
+
+              <Sparkle x={525} y={196} s={0.9} d="0s" />
+              <Sparkle x={12} y={306} s={0.8} d="-1.2s" />
+              <Sparkle x={684} y={496} s={1} d="-2.1s" />
+            </svg>
+          </div>
+        </div>
+
+        <p className="kc-sr-only" aria-live="polite">
+          {open ? 'The envelope is open. Write your message.' : ''}
+        </p>
+      </section>
     </div>
   )
 }

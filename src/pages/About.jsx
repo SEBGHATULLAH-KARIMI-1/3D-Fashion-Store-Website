@@ -1,13 +1,12 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { feature } from 'topojson-client'
-import land110 from 'world-atlas/land-110m.json'
-import land50 from 'world-atlas/land-50m.json'
+import earthImg from '../earth.jpg'
 import Footer from '../components/Footer.jsx'
+import { img } from '../data/products'
 import { useReveal } from '../lib/useReveal'
 
 /* ================================================================
    About — "The Atelier, mapped"
-   1. A globe turns and zooms toward a city (scroll).
+   1. A globe (the photo in src/earth.jpg) zooms toward a city (scroll).
    2. Streets spread out from the centre, buildings rise.
    3. The camera dives in and flies along an avenue through five
       places a piece passes through.
@@ -18,8 +17,6 @@ const MAP = 3000 // map is MAP x MAP px; 1 map unit = 1 css px
 const STEPS = 220
 const SCROLL_SCREENS = 7.5 // how many screens tall the whole thing is
 const TARGET = { lon: 2.3522, lat: 48.8566 } // where the globe lands
-const TAU = Math.PI * 2
-const RAD = Math.PI / 180
 
 // The globe and the dive into the city take only the first 10% of the scroll,
 // so the road is reached quickly; the five chapters keep the rest.
@@ -277,9 +274,9 @@ const BLOCKS = (() => {
   )
   const r = rng(77)
   const lots = CITY.lots
-    .filter((l) => l.dR < 1250)
+    .filter((l) => l.dR < 1050)
     .sort((a, b) => a.dR - b.dR)
-    .slice(0, 165)
+    .slice(0, 105)
   lots.forEach((l) => {
     const cx = l.x + l.w / 2
     const cy = l.y + l.d / 2
@@ -294,8 +291,8 @@ const BLOCKS = (() => {
       oy: Math.floor(r() * 120),
     }
     out.push({ x: l.x, y: l.y, w: l.w, d: l.d, h, z: 0, g: 0, ...base })
-    if (c === 'a') {
-      // zinc mansard roof: the Paris skyline
+    if (c === 'a' && l.dR < 700) {
+      // zinc mansard roof: the Paris skyline (only near the route, where it can be seen)
       out.push({ x: l.x + 4, y: l.y + 4, w: l.w - 8, d: l.d - 8, h: 24, z: h, g: 0, m: 1, ...base })
     } else if (h > 150) {
       const sw = l.w * 0.62
@@ -379,7 +376,7 @@ const WINVARS = (() => {
 
 const DUST = (() => {
   const r = rng(5)
-  return Array.from({ length: 36 }, () => ({
+  return Array.from({ length: 14 }, () => ({
     x: r() * 100,
     y: r() * 100,
     s: 1.5 + r() * 2.6,
@@ -389,436 +386,114 @@ const DUST = (() => {
 })()
 
 /* ------------------------------------------------------------ globe */
-
-const BLUE = '18,18,16'
-const SUN = [-0.5, 0.45, 0.74] // light direction in view space (x right, y up, z towards the viewer)
-
-// [lon, lat, radius in degrees, rgb, alpha, hard edge] rough biomes painted over the land
-const BIOMES = [
-  [12, 24, 21, '218,184,118', 0.95],
-  [15, 10, 14, '170,168,86', 0.6],
-  [45, 24, 12, '220,186,120', 0.9],
-  [60, 36, 10, '198,172,124', 0.6],
-  [102, 43, 14, '204,180,130', 0.8],
-  [88, 33, 9, '176,156,132', 0.8],
-  [134, -25, 17, '208,152,96', 0.9],
-  [22, -23, 10, '210,176,116', 0.8],
-  [-69, -45, 9, '170,160,110', 0.6],
-  [-69, -22, 6, '176,142,108', 0.8],
-  [-110, 35, 9, '208,176,118', 0.7],
-  [-100, 42, 10, '160,168,92', 0.6],
-  [-104, 27, 7, '206,172,112', 0.7],
-  [78, 21, 8, '168,164,84', 0.55],
-  [-62, -5, 15, '28,84,42', 0.9],
-  [23, 0, 10, '28,84,42', 0.9],
-  [112, -1, 9, '30,90,46', 0.8],
-  [102, 16, 8, '36,96,50', 0.7],
-  [100, 61, 24, '52,88,66', 0.8],
-  [-100, 59, 22, '54,88,68', 0.8],
-  [15, 56, 10, '80,126,70', 0.5],
-  [-80, 36, 8, '50,100,56', 0.7],
-  [-95, 73, 10, '200,212,214', 0.7],
-  [110, 72, 13, '200,212,214', 0.7],
-  [-42, 73, 13, '244,248,255', 1, 1],
-  [0, -90, 28, '244,248,255', 1, 1],
+// The globe is the photo in src/earth.jpg, cropped to a circle in CSS (see .fl-orb in about.css).
+// Its centre and radius inside the 736 x 1104 photo are baked into the CSS percentages.
+// Paris sits a little above and left of the globe's centre, so the zoom aims there:
+const PARIS_ON_GLOBE = [-0.0225, -0.195] // offset from the globe centre, in globe diameters
+const FLOATERS = [
+  // [product image, left %, top % (of the globe box), width %, tilt deg, float delay s]
+  ['tank-black', -4, 22, 17, -10, 0],
+  ['its-us-tee-bubblegum', 98, 6, 17, 9, -2],
+  ['jersey-yellow', -16, 76, 17, -7, -4],
+  ['varsity', 94, 74, 18, 8, -6],
 ]
 
-const CITIES = [
-  [2.35, 48.86], [-0.13, 51.5], [-3.7, 40.4], [12.5, 41.9], [13.4, 52.5], [37.6, 55.75], [29, 41],
-  [31.2, 30], [3.4, 6.5], [28, -26.2], [36.8, -1.3], [55.3, 25.2], [51.4, 35.7], [77.2, 28.6],
-  [72.8, 19], [90.4, 23.8], [100.5, 13.7], [106.8, -6.2], [103.8, 1.35], [116.4, 39.9], [121.5, 31.2],
-  [114.2, 22.3], [127, 37.6], [139.7, 35.7], [151.2, -33.9], [-46.6, -23.5], [-58.4, -34.6],
-  [-77, -12], [-74, 4.7], [-99.1, 19.4], [-118.2, 34], [-74, 40.7], [-87.6, 41.9], [-79.4, 43.7],
-  [-95.4, 29.8], [121, 14.6], [67, 24.9], [88.4, 22.6],
-]
+// The photo is drawn on a sphere with a tiny WebGL shader, so the globe can turn gently.
+// It sways about +-18 degrees: the photo only shows one side of the Earth, so a full spin would
+// run out of picture. If WebGL is missing, the plain <img> inside the globe stays visible.
+// Centre and radius of the globe inside the 736 x 1104 photo (a little inside the real rim):
+const PHOTO = { cx: 366, cy: 553, r: 306 }
+const GLOBE_VS = 'attribute vec2 aP;varying vec2 vP;void main(){vP=aP;gl_Position=vec4(aP,0.0,1.0);}'
+const GLOBE_FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec2 vP;
+uniform sampler2D uTex;
+uniform float uAng;
+uniform vec2 uC;
+uniform vec2 uR;
+void main(){
+  float r2 = dot(vP, vP);
+  float z = sqrt(max(0.0, 1.0 - r2));
+  float c = cos(uAng);
+  float s = sin(uAng);
+  vec2 q = vec2(vP.x * c + z * s, vP.y);
+  float rho = length(q);
+  if (rho > 0.96) q *= (0.96 - (rho - 0.96)) / rho;
+  vec3 col = texture2D(uTex, uC + vec2(q.x * uR.x, -q.y * uR.y)).rgb;
+  vec3 L = normalize(vec3(-0.45, 0.42, 0.78));
+  float d = clamp(dot(vec3(vP, z), L), 0.0, 1.0);
+  col *= 0.82 + 0.30 * d;
+  float rim = clamp((sqrt(r2) - 0.75) / 0.25, 0.0, 1.0);
+  rim *= rim;
+  col = col * (1.0 - 0.2 * rim) + vec3(0.35, 0.6, 1.0) * 0.25 * rim;
+  gl_FragColor = vec4(col, 1.0);
+}`
 
-const SPRITE_STOPS = {
-  soft: [[0, 1], [0.5, 0.8], [1, 0]],
-  hard: [[0, 1], [0.8, 1], [1, 0]],
-  cloud: [[0, 0.95], [0.4, 0.5], [1, 0]],
-  warm: [[0, 1], [0.2, 0.7], [1, 0]],
-}
-
-// Everything the globe needs, built once: coastlines, biomes, clouds, city lights.
-function buildEarth() {
-  const cache = {}
-  const sprite = (rgb, kind = 'soft') => {
-    const key = `${rgb}|${kind}`
-    if (cache[key]) return cache[key]
-    const c = document.createElement('canvas')
-    c.width = 128
-    c.height = 128
-    const g = c.getContext('2d')
-    const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64)
-    SPRITE_STOPS[kind].forEach(([o, a]) => gr.addColorStop(o, `rgba(${rgb},${a})`))
-    g.fillStyle = gr
-    g.fillRect(0, 0, 128, 128)
-    cache[key] = c
-    return c
+function makeGlobe(canvas, src, onReady) {
+  const gl = canvas.getContext('webgl', { antialias: false, alpha: true }) || canvas.getContext('experimental-webgl')
+  if (!gl) return null
+  const compile = (type, code) => {
+    const s = gl.createShader(type)
+    gl.shaderSource(s, code)
+    gl.compileShader(s)
+    return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null
   }
-  const vec = (lon, lat) => [Math.sin(lat * RAD), Math.cos(lat * RAD), Math.sin(lon * RAD), Math.cos(lon * RAD)]
-
-  const toRings = (topo) => {
-    const geo = feature(topo, topo.objects.land)
-    const feats = geo.type === 'FeatureCollection' ? geo.features : [geo]
-    const out = []
-    feats.forEach((f) => {
-      const geom = f.geometry
-      const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : []
-      polys.forEach((poly) =>
-        poly.forEach((ring) => {
-          const n = ring.length - 1 // the last point repeats the first
-          if (n < 3) return
-          const a = new Float32Array(n * 4)
-          for (let i = 0; i < n; i++) a.set(vec(ring[i][0], ring[i][1]), i * 4)
-          out.push(a)
-        }),
-      )
-    })
-    return out
+  const vs = compile(gl.VERTEX_SHADER, GLOBE_VS)
+  const fs = compile(gl.FRAGMENT_SHADER, GLOBE_FS)
+  if (!vs || !fs) return null
+  const prog = gl.createProgram()
+  gl.attachShader(prog, vs)
+  gl.attachShader(prog, fs)
+  gl.linkProgram(prog)
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null
+  gl.useProgram(prog)
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
+  const aP = gl.getAttribLocation(prog, 'aP')
+  gl.enableVertexAttribArray(aP)
+  gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, 0, 0)
+  const uAng = gl.getUniformLocation(prog, 'uAng')
+  const uC = gl.getUniformLocation(prog, 'uC')
+  const uR = gl.getUniformLocation(prog, 'uR')
+  let ready = false
+  const photo = new Image()
+  photo.onload = () => {
+    const tex = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, photo)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    const w = photo.naturalWidth
+    const h = photo.naturalHeight
+    gl.uniform2f(uC, PHOTO.cx / w, PHOTO.cy / h)
+    gl.uniform2f(uR, PHOTO.r / w, PHOTO.r / h)
+    ready = true
+    onReady()
   }
-
-  const r = rng(314)
-  const clouds = []
-  for (let g = 0; g < 48; g++) {
-    const lat = (r() + r() - 1) * 72
-    const lon = r() * 360 - 180
-    const n = 4 + Math.floor(r() * 6)
-    for (let k = 0; k < n; k++) {
-      const la = lat + (r() - 0.5) * 8
-      const lo = lon + ((r() - 0.5) * 18) / Math.max(0.35, Math.cos(lat * RAD))
-      clouds.push({
-        sp: Math.sin(la * RAD),
-        cp: Math.cos(la * RAD),
-        lon: lo * RAD,
-        rad: (2.2 + r() * 4.2) * RAD,
-        a: 0.3 + r() * 0.4,
-      })
-    }
-  }
-
+  photo.src = src
   return {
-    lo: toRings(land110),
-    hi: toRings(land50),
-    biomes: BIOMES.map(([lon, lat, deg, rgb, a, hard]) => ({
-      v: vec(lon, lat),
-      rad: deg * RAD,
-      a,
-      spr: sprite(rgb, hard ? 'hard' : 'soft'),
-    })),
-    clouds,
-    cloudSpr: sprite('255,255,255', 'cloud'),
-    cities: CITIES.map(([lon, lat]) => vec(lon, lat)),
-    warm: sprite('255,196,110', 'warm'),
-  }
-}
-
-const BUF = []
-
-function limbArc(pts, cx, cy, R, a0, a1) {
-  let d = a1 - a0
-  while (d > Math.PI) d -= TAU
-  while (d < -Math.PI) d += TAU
-  const m = Math.floor(Math.abs(d) / 0.14)
-  for (let k = 1; k <= m; k++) {
-    const a = a0 + (d * k) / (m + 1)
-    pts.push(cx + R * Math.cos(a), cy - R * Math.sin(a))
-  }
-}
-
-// Projects one coastline ring onto the visible hemisphere. Parts that go round
-// the back are followed along the horizon so the land never gets cut off.
-function pushRing(path, ring, V, smooth) {
-  const { cx, cy, R, c0, s0, cL, sL } = V
-  const pts = BUF
-  pts.length = 0
-  const n = ring.length / 4
-  let pvx = 0
-  let pvy = 0
-  let pvz = 0
-  let lastLimb = false
-  let lastAng = 0
-  let front = false
-  for (let i = 0; i < n; i++) {
-    const sp = ring[i * 4]
-    const cp = ring[i * 4 + 1]
-    const sl0 = ring[i * 4 + 2]
-    const cl0 = ring[i * 4 + 3]
-    const cl = cl0 * cL + sl0 * sL
-    const sl = sl0 * cL - cl0 * sL
-    const vx = cp * sl
-    const vy = c0 * sp - s0 * cp * cl
-    const vz = s0 * sp + c0 * cp * cl
-    if (i > 0 && vz >= 0 !== pvz >= 0) {
-      const tt = pvz / (pvz - vz)
-      let hx = pvx + (vx - pvx) * tt
-      let hy = pvy + (vy - pvy) * tt
-      const hl = Math.hypot(hx, hy) || 1
-      hx /= hl
-      hy /= hl
-      const ang = Math.atan2(hy, hx)
-      if (lastLimb) limbArc(pts, cx, cy, R, lastAng, ang)
-      pts.push(cx + R * hx, cy - R * hy)
-      lastAng = ang
-      lastLimb = true
-    }
-    if (vz >= 0) {
-      pts.push(cx + R * vx, cy - R * vy)
-      lastLimb = false
-      front = true
-    } else {
-      const l = Math.hypot(vx, vy) || 1
-      const ang = Math.atan2(vy, vx)
-      if (lastLimb) limbArc(pts, cx, cy, R, lastAng, ang)
-      pts.push(cx + (R * vx) / l, cy - (R * vy) / l)
-      lastAng = ang
-      lastLimb = true
-    }
-    pvx = vx
-    pvy = vy
-    pvz = vz
-  }
-  if (!front) return
-  const m = pts.length / 2
-  if (m < 3) return
-  if (smooth) {
-    path.moveTo((pts[0] + pts[2]) / 2, (pts[1] + pts[3]) / 2)
-    for (let i = 1; i < m; i++) {
-      const j = (i + 1) % m
-      path.quadraticCurveTo(pts[2 * i], pts[2 * i + 1], (pts[2 * i] + pts[2 * j]) / 2, (pts[2 * i + 1] + pts[2 * j + 1]) / 2)
-    }
-    path.quadraticCurveTo(pts[0], pts[1], (pts[0] + pts[2]) / 2, (pts[1] + pts[3]) / 2)
-  } else {
-    path.moveTo(pts[0], pts[1])
-    for (let i = 1; i < m; i++) path.lineTo(pts[2 * i], pts[2 * i + 1])
-  }
-  path.closePath()
-}
-
-// Draws a soft round sprite lying on the sphere (foreshortened towards the edge).
-function placeSprite(ctx, spr, V, sp, cp, sl0, cl0, rad, alpha) {
-  const cl = cl0 * V.cL + sl0 * V.sL
-  const sl = sl0 * V.cL - cl0 * V.sL
-  const vx = cp * sl
-  const vy = V.c0 * sp - V.s0 * cp * cl
-  const vz = V.s0 * sp + V.c0 * cp * cl
-  if (vz < -0.2) return
-  const fade = clamp((vz + 0.2) / 0.35)
-  const rr = V.R * Math.sin(rad)
-  ctx.save()
-  ctx.translate(V.cx + V.R * vx, V.cy - V.R * vy)
-  ctx.rotate(Math.atan2(-vy, vx))
-  ctx.scale(Math.max(0.1, vz), 1)
-  ctx.globalAlpha = V.op * alpha * fade
-  ctx.drawImage(spr, -rr, -rr, rr * 2, rr * 2)
-  ctx.restore()
-}
-
-function drawEarth(ctx, cw, ch, dpr, st, earth) {
-  const { lon0, lat0, scale, op, t, z } = st
-  ctx.clearRect(0, 0, cw, ch)
-  if (op <= 0.003) return
-
-  const cx = cw / 2
-  const cy = ch * lerp(0.44, 0.5, z)
-  const R = Math.min(cw, ch) * 0.27 * scale
-  const L0 = lon0 * RAD
-  const P0 = lat0 * RAD
-  const s0 = Math.sin(P0)
-  const c0 = Math.cos(P0)
-  const V = { cx, cy, R, op, s0, c0, sL: Math.sin(L0), cL: Math.cos(L0) }
-  const sunX = cx + R * SUN[0]
-  const sunY = cy - R * SUN[1]
-
-  const proj = (lon, lat) => {
-    const l = lon * RAD - L0
-    const p = lat * RAD
-    const sp = Math.sin(p)
-    const cp = Math.cos(p)
-    const cl = Math.cos(l)
-    return [cx + R * cp * Math.sin(l), cy - R * (c0 * sp - s0 * cp * cl), s0 * sp + c0 * cp * cl]
-  }
-
-  // orbit ring: the back half goes behind the planet, the front half in front
-  const orbit = (frontHalf) => {
-    if (z >= 0.55) return
-    ctx.save()
-    ctx.globalAlpha = op * (1 - z / 0.55)
-    ctx.translate(cx, cy)
-    ctx.rotate(-0.32)
-    ctx.strokeStyle = `rgba(${BLUE},.4)`
-    ctx.lineWidth = Math.max(1, dpr)
-    ctx.beginPath()
-    ctx.ellipse(0, 0, R * 1.55, R * 0.4, 0, frontHalf ? 0 : Math.PI, frontHalf ? Math.PI : TAU)
-    ctx.stroke()
-    if (frontHalf) {
-      const a = t * 0.6
-      const sx = Math.cos(a) * R * 1.55
-      const sy = Math.sin(a) * R * 0.4
-      if (sy > 0 || Math.abs(sx) > R * 0.92) {
-        ctx.fillStyle = `rgb(${BLUE})`
-        ctx.beginPath()
-        ctx.arc(sx, sy, 4.5 * dpr, 0, TAU)
-        ctx.fill()
+    resize(px) {
+      if (canvas.width !== px) {
+        canvas.width = px
+        canvas.height = px
       }
-    }
-    ctx.restore()
+    },
+    draw(ang) {
+      if (!ready) return
+      gl.viewport(0, 0, canvas.width, canvas.height)
+      gl.uniform1f(uAng, ang)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    },
   }
-
-  ctx.save()
-  ctx.globalAlpha = op
-
-  // soft shadow under the globe (only while it is small)
-  if (z < 0.45) {
-    ctx.save()
-    ctx.globalAlpha = op * (1 - z / 0.45)
-    ctx.translate(cx, cy + R * 1.32)
-    ctx.scale(1, 0.15)
-    const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.05)
-    sg.addColorStop(0, 'rgba(18,18,16,.3)')
-    sg.addColorStop(1, 'rgba(18,18,16,0)')
-    ctx.fillStyle = sg
-    ctx.beginPath()
-    ctx.arc(0, 0, R * 1.05, 0, TAU)
-    ctx.fill()
-    ctx.restore()
-  }
-
-  orbit(false)
-
-  // outer atmosphere glow
-  const ag = ctx.createRadialGradient(cx, cy, R * 0.96, cx, cy, R * 1.22)
-  ag.addColorStop(0, 'rgba(110,170,255,.55)')
-  ag.addColorStop(0.35, 'rgba(110,170,255,.22)')
-  ag.addColorStop(1, 'rgba(110,170,255,0)')
-  ctx.fillStyle = ag
-  ctx.beginPath()
-  ctx.arc(cx, cy, R * 1.22, 0, TAU)
-  ctx.fill()
-
-  // the sphere
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(cx, cy, R, 0, TAU)
-  ctx.clip()
-
-  // ocean, lit from the upper left
-  const oc = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, R * 1.8)
-  oc.addColorStop(0, '#4aa0ee')
-  oc.addColorStop(0.3, '#2a73c8')
-  oc.addColorStop(0.62, '#124a9a')
-  oc.addColorStop(1, '#06214f')
-  ctx.fillStyle = oc
-  ctx.fillRect(cx - R, cy - R, R * 2, R * 2)
-
-  // sun glint on the water
-  const gx = cx + R * SUN[0] * 0.7
-  const gy = cy - R * SUN[1] * 0.7
-  const gl = ctx.createRadialGradient(gx, gy, 0, gx, gy, R * 0.34)
-  gl.addColorStop(0, 'rgba(255,255,255,.45)')
-  gl.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = gl
-  ctx.fillRect(cx - R, cy - R, R * 2, R * 2)
-
-  // land (real coastlines; the detailed set takes over when we zoom in)
-  const smooth = scale < 2.4
-  const rings = smooth ? earth.lo : earth.hi
-  const landPath = new Path2D()
-  for (let i = 0; i < rings.length; i++) pushRing(landPath, rings[i], V, smooth)
-  ctx.lineJoin = 'round'
-  ctx.lineWidth = R * 0.016
-  ctx.strokeStyle = 'rgba(120,205,255,.22)' // shallow water
-  ctx.stroke(landPath)
-  ctx.lineWidth = R * 0.007
-  ctx.strokeStyle = 'rgba(165,230,255,.35)'
-  ctx.stroke(landPath)
-  ctx.fillStyle = '#5a8a42'
-  ctx.fill(landPath)
-
-  // deserts, rainforest, taiga, ice
-  ctx.save()
-  ctx.clip(landPath)
-  for (let i = 0; i < earth.biomes.length; i++) {
-    const b = earth.biomes[i]
-    placeSprite(ctx, b.spr, V, b.v[0], b.v[1], b.v[2], b.v[3], b.rad, b.a)
-  }
-  ctx.restore()
-
-  // clouds drift slowly over the ground
-  const drift = t * 0.004
-  for (let i = 0; i < earth.clouds.length; i++) {
-    const c = earth.clouds[i]
-    const l = c.lon + drift
-    placeSprite(ctx, earth.cloudSpr, V, c.sp, c.cp, Math.sin(l), Math.cos(l), c.rad, c.a)
-  }
-  ctx.globalAlpha = op
-
-  // day / night: the far side falls into shadow
-  const td = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, R * 1.95)
-  td.addColorStop(0, 'rgba(3,10,34,0)')
-  td.addColorStop(0.55, 'rgba(3,10,34,0)')
-  td.addColorStop(0.72, 'rgba(3,10,34,.55)')
-  td.addColorStop(0.85, 'rgba(3,10,34,.88)')
-  td.addColorStop(1, 'rgba(3,10,34,.93)')
-  ctx.fillStyle = td
-  ctx.fillRect(cx - R, cy - R, R * 2, R * 2)
-
-  // city lights on the dark side
-  for (let i = 0; i < earth.cities.length; i++) {
-    const v = earth.cities[i]
-    const cl = v[3] * V.cL + v[2] * V.sL
-    const sl = v[2] * V.cL - v[3] * V.sL
-    const vx = v[1] * sl
-    const vy = c0 * v[0] - s0 * v[1] * cl
-    const vz = s0 * v[0] + c0 * v[1] * cl
-    if (vz <= 0.05) continue
-    const lit = vx * SUN[0] + vy * SUN[1] + vz * SUN[2]
-    const a = clamp((0.14 - lit) / 0.3) * clamp(vz * 4)
-    if (a < 0.03) continue
-    const rr = Math.max(3 * dpr, R * 0.02)
-    ctx.globalAlpha = op * a
-    ctx.drawImage(earth.warm, cx + R * vx - rr, cy - R * vy - rr, rr * 2, rr * 2)
-  }
-  ctx.globalAlpha = op
-
-  // atmosphere seen from inside, brightest at the edge
-  const ig = ctx.createRadialGradient(cx, cy, R * 0.72, cx, cy, R)
-  ig.addColorStop(0, 'rgba(120,180,255,0)')
-  ig.addColorStop(0.65, 'rgba(120,180,255,.16)')
-  ig.addColorStop(1, 'rgba(150,205,255,.6)')
-  ctx.fillStyle = ig
-  ctx.fillRect(cx - R, cy - R, R * 2, R * 2)
-  ctx.restore()
-
-  // rim
-  ctx.lineWidth = Math.max(1, dpr)
-  ctx.strokeStyle = 'rgba(150,200,255,.45)'
-  ctx.beginPath()
-  ctx.arc(cx, cy, R, 0, TAU)
-  ctx.stroke()
-
-  orbit(true)
-
-  // marker on the target city
-  const [mx, my, mc] = proj(TARGET.lon, TARGET.lat)
-  if (mc > 0.02) {
-    const k = (t * 0.8) % 1
-    const ms = Math.min(2.2, 0.6 + scale * 0.35)
-    ctx.strokeStyle = `rgba(200,255,46,${(1 - k) * 0.9})`
-    ctx.lineWidth = Math.max(1.5, dpr * 1.6)
-    ctx.beginPath()
-    ctx.arc(mx, my, (7 + 26 * k) * dpr * ms, 0, TAU)
-    ctx.stroke()
-    ctx.fillStyle = '#c8ff2e'
-    ctx.strokeStyle = '#121210'
-    ctx.lineWidth = Math.max(2, dpr * 2)
-    ctx.beginPath()
-    ctx.arc(mx, my, 5 * dpr * ms, 0, TAU)
-    ctx.fill()
-    ctx.stroke()
-  }
-  ctx.restore()
 }
+
+
 
 /* -------------------------------------------------- static 3D world */
 
@@ -836,7 +511,7 @@ const Block = ({ b }) => (
       '--oy': `${b.oy || 0}px`,
     }}
   >
-    {!b.z && <i className="sd" />}
+    {!b.z && b.h > 70 && <i className="sd" />}
     <i className="t" />
     <i className="s" />
     <i className="n" />
@@ -845,13 +520,15 @@ const Block = ({ b }) => (
   </div>
 )
 
-const Blocks = memo(function Blocks() {
+// Buildings grow by scaling this one wrapper along Z (a single transform per frame),
+// instead of re-laying-out the five faces of every building.
+const Blocks = memo(function Blocks({ cityRef }) {
   return (
-    <>
+    <div className="fl-city" ref={cityRef}>
       {BLOCKS.map((b, i) => (
         <Block key={i} b={b} />
       ))}
-    </>
+    </div>
   )
 })
 
@@ -871,7 +548,8 @@ const ZEBRA = (() => {
   return out
 })()
 
-const MapSvg = memo(function MapSvg({ glowRef, lineRef, dotRef }) {
+// The big static map: painted once, never touched again.
+const MapSvg = memo(function MapSvg() {
   return (
     <svg className="fl-svg" viewBox={`0 0 ${MAP} ${MAP}`} width={MAP} height={MAP} aria-hidden="true">
       <defs>
@@ -883,16 +561,6 @@ const MapSvg = memo(function MapSvg({ glowRef, lineRef, dotRef }) {
           <stop offset="0" stopColor="#7fa65a" />
           <stop offset="1" stopColor="#3f6b2c" />
         </radialGradient>
-        <filter id="noise" x="0" y="0" width="100%" height="100%">
-          <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch" />
-          <feColorMatrix type="saturate" values="0" />
-        </filter>
-        <pattern id="ng" width="300" height="300" patternUnits="userSpaceOnUse">
-          <rect width="300" height="300" filter="url(#noise)" opacity=".5" />
-        </pattern>
-        <filter id="mblur" x="-10%" y="-10%" width="120%" height="120%">
-          <feGaussianBlur stdDeviation="9" />
-        </filter>
         <pattern id="zebH" width="10" height="10" patternUnits="userSpaceOnUse">
           <rect width="10" height="5" fill="#e9e7df" />
         </pattern>
@@ -928,7 +596,7 @@ const MapSvg = memo(function MapSvg({ glowRef, lineRef, dotRef }) {
         <rect key={`z${i}`} x={z[0]} y={z[1]} width={z[2]} height={z[3]} fill={z[4] === 'H' ? 'url(#zebH)' : 'url(#zebV)'} opacity=".85" />
       ))}
 
-      <rect width={MAP} height={MAP} fill="url(#ng)" opacity=".22" />
+      {/* (the film grain that used to be an feTurbulence filter here is the CSS .fl-grain layer now) */}
 
       {/* trees in parks */}
       {CITY.trees.map((t, i) => (
@@ -943,7 +611,6 @@ const MapSvg = memo(function MapSvg({ glowRef, lineRef, dotRef }) {
       <path d={RIVER_D} fill="none" stroke="#cbc5b6" strokeWidth="190" strokeLinecap="round" strokeLinejoin="round" />
       <path d={RIVER_D} fill="none" stroke="#6a93a6" strokeWidth="150" strokeLinecap="round" strokeLinejoin="round" />
       <path d={RIVER_D} fill="none" stroke="#5a8499" strokeOpacity=".9" strokeWidth="90" strokeLinecap="round" strokeLinejoin="round" />
-      <path className="rv" d={RIVER_D} fill="none" stroke="#ffffff" strokeOpacity=".7" strokeWidth="3" strokeLinecap="round" strokeDasharray="46 120" />
 
       {/* the avenue the camera follows */}
       <path d={ROUTE_D} fill="none" stroke="#d6d2c8" strokeWidth="210" strokeLinecap="round" strokeLinejoin="round" />
@@ -959,12 +626,6 @@ const MapSvg = memo(function MapSvg({ glowRef, lineRef, dotRef }) {
         </g>
       )}
 
-      {/* traffic */}
-      <path className="cr c1" d={LANE_A} fill="none" stroke="#e9e7e1" strokeWidth="11" strokeDasharray="16 272" />
-      <path className="cr c2" d={LANE_A} fill="none" stroke="#2d4f78" strokeWidth="11" strokeDasharray="16 272" />
-      <path className="cr c3" d={LANE_B} fill="none" stroke="#b13b30" strokeWidth="11" strokeDasharray="16 272" />
-      <path className="cr c4" d={LANE_B} fill="none" stroke="#c9c6be" strokeWidth="11" strokeDasharray="16 272" />
-
       {/* trees + street lamps along the avenue */}
       {AV.trees.map((t, i) => (
         <g key={i}>
@@ -979,9 +640,28 @@ const MapSvg = memo(function MapSvg({ glowRef, lineRef, dotRef }) {
         </g>
       ))}
 
-      {/* the glowing route that is drawn as you scroll */}
-      <path ref={glowRef} d={ROUTE_D} pathLength="1" fill="none" stroke="#c8ff2e" strokeWidth="26" strokeLinecap="round" strokeDasharray="1 1" strokeDashoffset="1" filter="url(#mblur)" opacity=".75" />
-      <path ref={lineRef} d={ROUTE_D} pathLength="1" fill="none" stroke="#c8ff2e" strokeWidth="8" strokeLinecap="round" strokeDasharray="1 1" strokeDashoffset="1" />
+    </svg>
+  )
+})
+
+// Everything that moves (river glints, traffic, the glowing route, the beacon) lives in
+// its own transparent layer, so repainting it never touches the big map underneath.
+const RouteSvg = memo(function RouteSvg({ routeRef, dotRef }) {
+  return (
+    <svg ref={routeRef} className="fl-svg" viewBox={`0 0 ${MAP} ${MAP}`} width={MAP} height={MAP} aria-hidden="true">
+      <path className="rv" d={RIVER_D} fill="none" stroke="#ffffff" strokeOpacity=".7" strokeWidth="3" strokeLinecap="round" strokeDasharray="46 120" />
+
+      {/* traffic */}
+      <path className="cr c1" d={LANE_A} fill="none" stroke="#e9e7e1" strokeWidth="11" strokeDasharray="16 272" />
+      <path className="cr c2" d={LANE_A} fill="none" stroke="#2d4f78" strokeWidth="11" strokeDasharray="16 272" />
+      <path className="cr c3" d={LANE_B} fill="none" stroke="#b13b30" strokeWidth="11" strokeDasharray="16 272" />
+      <path className="cr c4" d={LANE_B} fill="none" stroke="#c9c6be" strokeWidth="11" strokeDasharray="16 272" />
+
+      {/* the glowing route that is drawn as you scroll. The glow is two wide, soft strokes
+          (no blur filter); the dash offset comes from the --off variable set in the tick. */}
+      <path className="rt" d={ROUTE_D} pathLength="1" fill="none" stroke="#c8ff2e" strokeOpacity=".16" strokeWidth="46" strokeLinecap="round" strokeDasharray="1 1" />
+      <path className="rt" d={ROUTE_D} pathLength="1" fill="none" stroke="#c8ff2e" strokeOpacity=".3" strokeWidth="28" strokeLinecap="round" strokeDasharray="1 1" />
+      <path className="rt" d={ROUTE_D} pathLength="1" fill="none" stroke="#c8ff2e" strokeWidth="8" strokeLinecap="round" strokeDasharray="1 1" />
       <circle ref={dotRef} r="22" fill="#c8ff2e" stroke="#121210" strokeWidth="7" cx={WP[0][0]} cy={WP[0][1]} />
     </svg>
   )
@@ -1015,9 +695,13 @@ export default function About() {
   const stageRef = useRef(null)
   const camRef = useRef(null)
   const worldRef = useRef(null)
-  const globeRef = useRef(null)
-  const glowRef = useRef(null)
-  const lineRef = useRef(null)
+  const earthRef = useRef(null)
+  const orbRef = useRef(null)
+  const glRef = useRef(null)
+  const airRef = useRef(null)
+  const ringRef = useRef(null)
+  const routeRef = useRef(null)
+  const cityRef = useRef(null)
   const dotRef = useRef(null)
   const introRef = useRef(null)
   const outroRef = useRef(null)
@@ -1033,28 +717,34 @@ export default function About() {
     const stage = stageRef.current
     const world = worldRef.current
     const camEl = camRef.current
-    const cv = globeRef.current
-    const ctx = cv.getContext('2d')
-    const svg = world.querySelector('.fl-svg')
+    const earthEl = earthRef.current
+    const orbEl = orbRef.current
+    const airEl = airRef.current
+    const ringEl = ringRef.current
+    const globe = makeGlobe(glRef.current, earthImg, () => orbEl.classList.add('gl'))
+    const maps = world.querySelectorAll('.fl-svg') // the static map + the moving overlay
+    const city = cityRef.current
+    const routeSvg = routeRef.current
+    const pinEls = world.querySelectorAll('.pin-bb')
     const sc = sec.closest('.page')
     if (!sc) return
 
-    const earth = buildEarth()
-    let dpr = 1
-    let cw = 0
-    let ch = 0
+    let orbD = 500 // diameter of the globe in px (measured in resize)
+    let range = 1
+    let secTop = 0
+    let dirty = true // something outside the tick changed: the next frame must redraw
     const resize = () => {
-      dpr = Math.min(2, window.devicePixelRatio || 1)
-      cw = Math.round(stage.clientWidth * dpr)
-      ch = Math.round(stage.clientHeight * dpr)
-      cv.width = cw
-      cv.height = ch
+      orbD = orbEl.offsetWidth || 500
+      if (globe) globe.resize(Math.round(orbD * Math.min(1.5, window.devicePixelRatio || 1)))
+      // measured here, not on every scroll event (reading layout while scrolling is costly)
+      range = Math.max(1, sec.offsetHeight - stage.offsetHeight)
+      secTop = sec.offsetTop
+      dirty = true
     }
 
     let p = 0
     const readP = () => {
-      const range = Math.max(1, sec.offsetHeight - stage.offsetHeight)
-      p = warpP(clamp((sc.scrollTop - sec.offsetTop) / range))
+      p = warpP(clamp((sc.scrollTop - secTop) / range))
     }
     const onResize = () => {
       resize()
@@ -1067,34 +757,27 @@ export default function About() {
 
     const cam = { cx: MAP / 2, cy: MAP / 2, rz: 0, tilt: 0, dz: -2100, u: 0, sx: 0, sy: 0 }
     let lastHs = -1
+    let lastP = -1
+    let lastEarth = ''
+    let lastCoord = ''
+    let lastGlobeDraw = 0
+    let lastCam = ''
+    let lastClip = ''
+    let lastRun = null
+    let lastGrown = null
+    let lastOff = ''
+    let lastDotOn = false
+    let lastHud = ''
+    let wasLive = true
     let raf
     let last = performance.now()
 
     const tick = (now) => {
+      raf = requestAnimationFrame(tick)
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
-      const t = now / 1000
 
-      /* ---- phase 1: the globe */
-      const z = Math.pow(clamp((p - 0.02) / 0.18), 2.2)
-      const e = smooth(clamp(p / 0.16))
-      const auto = -20 + t * 7
-      const lon0 = auto + wrap(TARGET.lon - auto) * e
-      const lat0 = lerp(16, TARGET.lat, e)
-      const gop = 1 - smooth(clamp((p - 0.15) / 0.07))
-      drawEarth(ctx, cw, ch, dpr, { lon0, lat0, scale: 1 + 6 * z, op: gop, t, z }, earth)
-
-      /* ---- phase 2: streets spread out from the centre, buildings rise */
-      camEl.style.opacity = smooth(clamp((p - 0.1) / 0.1)).toFixed(3)
-      const rev = smooth(clamp((p - 0.1) / 0.13)) * 2400
-      svg.style.clipPath = `circle(${rev.toFixed(0)}px at 1500px 1500px)`
-      const hs = smooth(clamp((p - 0.16) / 0.14))
-      if (Math.abs(hs - lastHs) > 0.004 || ((hs === 0 || hs === 1) && hs !== lastHs)) {
-        world.style.setProperty('--hs', hs.toFixed(3))
-        lastHs = hs
-      }
-
-      /* ---- phase 3: dive in and fly along the avenue */
+      /* ---- where everything wants to be right now (maths only, nothing is written yet) */
       const dive = smooth(clamp((p - 0.2) / 0.1))
       const outro = smooth(clamp((p - 0.93) / 0.07))
       const q = clamp((p - 0.3) / 0.63)
@@ -1118,6 +801,97 @@ export default function About() {
       rz = lerp(rz, -12, outro)
       rz = cam.rz + wrap(rz - cam.rz)
 
+      // Has the scroll stopped and the camera caught up with its target? Then nothing
+      // has to be written to the DOM this frame (only the globe keeps turning).
+      const err =
+        Math.abs(tx - cam.cx) +
+        Math.abs(ty - cam.cy) +
+        Math.abs(dz - cam.dz) +
+        (Math.abs(tilt - cam.tilt) + Math.abs(rz - cam.rz)) * 10 +
+        Math.abs(uT - cam.u) * 100 +
+        (Math.abs(ptr.current.x - cam.sx) + Math.abs(ptr.current.y - cam.sy)) * 500
+      const settled = !dirty && p === lastP && err < 0.02
+
+      /* ---- phase 1: the globe (the photo) zooms toward Paris, then fades into the city */
+      const gop = 1 - smooth(clamp((p - 0.15) / 0.07))
+      const live = gop > 0.003
+      if (live || wasLive) {
+        const z = Math.pow(clamp((p - 0.02) / 0.18), 2.2)
+        const e = smooth(clamp(p / 0.16))
+        const gs = 1 + 4.6 * z
+        // the globe turns gently (a slow sway); it settles as the zoom starts so Paris is where we aim
+        if (globe && live && (!settled || now - lastGlobeDraw > 33)) {
+          const amp = 0.31 * (1 - smooth(clamp(p / 0.08)))
+          globe.draw(Math.sin(now * 0.00022449) * amp)
+          lastGlobeDraw = now
+        }
+        // scale around the centre, and slide so that Paris ends up in the middle
+        const gx = -gs * PARIS_ON_GLOBE[0] * orbD * e
+        const gy = -gs * PARIS_ON_GLOBE[1] * orbD * e
+        const earthT = `translate3d(${gx.toFixed(1)}px,${gy.toFixed(1)}px,0) scale(${gs.toFixed(3)})`
+        const key = `${earthT}|${gop.toFixed(3)}|${live}`
+        if (key !== lastEarth) {
+          lastEarth = key
+          earthEl.style.transform = earthT
+          earthEl.style.opacity = gop.toFixed(3)
+          earthEl.style.visibility = live ? 'visible' : 'hidden'
+          airEl.style.opacity = gop.toFixed(3)
+          airEl.style.visibility = live ? 'visible' : 'hidden'
+          // the ring and the floating pieces melt away early in the zoom
+          ringEl.style.opacity = (1 - clamp(z / 0.3)).toFixed(3)
+        }
+        wasLive = live
+        if (live && p < 0.2 && coordRef.current) {
+          const lat = lerp(34.6937, TARGET.lat, e)
+          const lon = lerp(135.5023, TARGET.lon, e)
+          const txt = `LAT ${lat.toFixed(4)}°  ·  LON ${lon.toFixed(4)}°  ·  ORBIT ${gs.toFixed(1)}`
+          if (txt !== lastCoord) {
+            coordRef.current.textContent = txt
+            lastCoord = txt
+          }
+        }
+      }
+
+      if (settled) return
+      lastP = p
+      dirty = false
+
+      /* ---- phase 2: streets spread out from the centre, buildings rise */
+      // the 3D city is not even drawn until it starts to fade in (it is thousands of faces)
+      const camOp = smooth(clamp((p - 0.1) / 0.1))
+      const camKey = camOp.toFixed(3)
+      if (camKey !== lastCam) {
+        camEl.style.opacity = camKey
+        camEl.style.visibility = camOp > 0.002 ? 'visible' : 'hidden'
+        lastCam = camKey
+      }
+      const rev = smooth(clamp((p - 0.1) / 0.13)) * 2400
+      // once the whole map is revealed the clip is removed (a clip mask costs on every frame)
+      const clip = rev >= 2399 ? 'none' : `circle(${rev.toFixed(0)}px at 1500px 1500px)`
+      if (clip !== lastClip) {
+        for (let n = 0; n < maps.length; n++) maps[n].style.clipPath = clip
+        lastClip = clip
+      }
+      const hs = smooth(clamp((p - 0.16) / 0.14))
+      if (Math.abs(hs - lastHs) > 0.004 || ((hs === 0 || hs === 1) && hs !== lastHs)) {
+        // one transform on the wrapper grows every building at once
+        city.style.transform = `scale3d(1,1,${Math.max(hs, 0.0001).toFixed(4)})`
+        lastHs = hs
+      }
+      const grown = hs > 0.6
+      if (grown !== lastGrown) {
+        city.classList.toggle('grown', grown) // fades the ground shadows in
+        lastGrown = grown
+      }
+      // river glints and traffic only animate while the city is on screen
+      const run = p > 0.2 && p < 0.97
+      if (run !== lastRun) {
+        world.classList.toggle('run', run)
+        lastRun = run
+      }
+
+      /* ---- phase 3: dive in and fly along the avenue (the targets were worked out above) */
+
       // ease the real camera toward it (this is the cinematic inertia)
       const k = 1 - Math.exp(-dt * 5)
       cam.cx += (tx - cam.cx) * k
@@ -1133,19 +907,25 @@ export default function About() {
       const tiltE = cam.tilt - cam.sy * 2.6
       const rzE = cam.rz + cam.sx * 2.4
       world.style.transform = `translate3d(0,0,${cam.dz.toFixed(1)}px) rotateX(${tiltE.toFixed(2)}deg) rotateZ(${rzE.toFixed(2)}deg) translate3d(${(-cam.cx).toFixed(1)}px,${(-cam.cy).toFixed(1)}px,0)`
-      world.style.setProperty('--tilt', `${tiltE.toFixed(2)}deg`)
-      world.style.setProperty('--rz', `${rzE.toFixed(2)}deg`)
+      // the pin labels counter-rotate to face the camera. Set on the five pins directly:
+      // custom properties on the world would be inherited by every building face.
+      const pinT = `rotateZ(${(-rzE).toFixed(2)}deg) rotateX(${(-tiltE).toFixed(2)}deg)`
+      for (let n = 0; n < pinEls.length; n++) pinEls[n].style.transform = pinT
 
       // route drawing + beacon
       const off = (1 - arcAt(cam.u) * dive).toFixed(4)
-      if (glowRef.current) glowRef.current.style.strokeDashoffset = off
-      if (lineRef.current) lineRef.current.style.strokeDashoffset = off
-      if (dotRef.current) {
+      if (off !== lastOff) {
+        routeSvg.style.setProperty('--off', off)
+        lastOff = off
+      }
+      const dotOn = dive > 0.001
+      if (dotRef.current && (dotOn || lastDotOn)) {
         const [dx, dy] = routePoint(cam.u)
         dotRef.current.setAttribute('cx', dx.toFixed(1))
         dotRef.current.setAttribute('cy', dy.toFixed(1))
         dotRef.current.style.opacity = dive.toFixed(2)
       }
+      lastDotOn = dotOn
 
       // overlays
       const introOp = 1 - clamp(p / 0.06)
@@ -1169,11 +949,12 @@ export default function About() {
 
       // HUD
       if (progRef.current) progRef.current.style.transform = `scaleX(${p.toFixed(4)})`
-      if (coordRef.current) {
-        coordRef.current.textContent =
-          p < 0.2
-            ? `LAT ${lat0.toFixed(2)}°  ·  LON ${wrap(lon0).toFixed(2)}°  ·  ORBIT`
-            : `X ${String(Math.round(cam.cx)).padStart(4, '0')}  ·  Y ${String(Math.round(cam.cy)).padStart(4, '0')}  ·  ALT ${String(Math.round(2100 + cam.dz)).padStart(4, '0')}`
+      if (coordRef.current && p >= 0.2) {
+        const txt = `X ${String(Math.round(cam.cx)).padStart(4, '0')}  ·  Y ${String(Math.round(cam.cy)).padStart(4, '0')}  ·  ALT ${String(Math.round(2100 + cam.dz)).padStart(4, '0')}`
+        if (txt !== lastHud) {
+          coordRef.current.textContent = txt
+          lastHud = txt
+        }
       }
 
       // which chapter is on screen
@@ -1182,8 +963,6 @@ export default function About() {
         idxRef.current = a
         setIdx(a)
       }
-
-      raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => {
@@ -1213,18 +992,72 @@ export default function About() {
         <div className="fl-stage" ref={stageRef} onPointerMove={onMove}>
           <div className="fl-sky" />
 
-          <div className="fl-cam" ref={camRef}>
+          <div className="fl-cam" ref={camRef} style={{ opacity: 0, visibility: 'hidden' }}>
             <div className="fl-world" ref={worldRef} style={WINVARS}>
-              <MapSvg glowRef={glowRef} lineRef={lineRef} dotRef={dotRef} />
-              <Blocks />
+              <MapSvg />
+              <RouteSvg routeRef={routeRef} dotRef={dotRef} />
+              <Blocks cityRef={cityRef} />
               <Pins active={idx} />
             </div>
           </div>
 
           <div className="fl-fog" />
           <div className="fl-pool" />
-          <div className="fl-dof" />
-          <canvas className="fl-globe" ref={globeRef} aria-hidden="true" />
+          <div className="fl-air" ref={airRef} aria-hidden="true">
+            <svg className="fl-arc a" viewBox="0 0 800 600" preserveAspectRatio="none">
+              <path d="M-10 560 C 60 300 380 70 810 30" />
+            </svg>
+            <svg className="fl-arc b" viewBox="0 0 800 600" preserveAspectRatio="none">
+              <path d="M810 140 C 560 190 300 380 120 620" />
+            </svg>
+            <i className="fl-cloud l" />
+            <i className="fl-cloud r" />
+          </div>
+
+          <div className="fl-earth" ref={earthRef} aria-hidden="true">
+            <div className="fl-shadow" />
+            <div className="fl-glow" />
+            <div className="fl-orb" ref={orbRef}>
+              <img src={earthImg} alt="" draggable="false" />
+              <canvas className="fl-gl" ref={glRef} />
+            </div>
+            <div className="fl-ringwrap" ref={ringRef}>
+              <svg className="fl-ring" viewBox="0 0 1000 320">
+                <defs>
+                  <radialGradient id="bead" cx="35%" cy="30%" r="75%">
+                    <stop offset="0" stopColor="#f3f7b8" />
+                    <stop offset="0.55" stopColor="#b4c63a" />
+                    <stop offset="1" stopColor="#6f7f12" />
+                  </radialGradient>
+                </defs>
+                <ellipse cx="500" cy="160" rx="495" ry="155" fill="none" stroke="#8d9a1f" strokeOpacity=".75" strokeWidth="2" />
+                {[
+                  [118, 11],
+                  [-35, 9],
+                  [-12, 6],
+                ].map(([deg, rad]) => (
+                  <circle
+                    key={deg}
+                    cx={500 + 495 * Math.cos((deg * Math.PI) / 180)}
+                    cy={160 + 155 * Math.sin((deg * Math.PI) / 180)}
+                    r={rad}
+                    fill="url(#bead)"
+                  />
+                ))}
+              </svg>
+              {FLOATERS.map(([slug, l, t, w, rot, delay]) => (
+                <img
+                  key={slug}
+                  className="fl-floater"
+                  src={img(slug, 'front')}
+                  alt=""
+                  draggable="false"
+                  decoding="async"
+                  style={{ left: `${l}%`, top: `${t}%`, width: `${w}%`, '--rot': `${rot}deg`, animationDelay: `${delay}s` }}
+                />
+              ))}
+            </div>
+          </div>
           <div className="fl-leak a" />
           <div className="fl-leak b" />
           <div className="fl-dust" aria-hidden="true">
@@ -1241,12 +1074,27 @@ export default function About() {
           <div className="fl-frame" aria-hidden="true" />
 
           <div className="fl-intro" ref={introRef}>
-            <p className="fl-eyebrow">The atelier, mapped</p>
-            <h1 className="fl-brand">Fancy Clothes</h1>
-            <p className="fl-sub">From the whole world down to one street: the five places a piece passes before it reaches the rack.</p>
+            <div className="fl-titlebox">
+              <h1 className="fl-brand" aria-label="Fancy Clothes">
+                Fancy Cl<span className="fl-o">o<b aria-hidden="true" /></span>thes
+              </h1>
+              <p className="fl-sub">
+                <i aria-hidden="true" />
+                <span>A world of style, curated for you.</span>
+                <i aria-hidden="true" />
+              </p>
+            </div>
             <button type="button" className="fl-enter" onClick={() => goChapter(0)}>
-              <span>Scroll to enter</span>
-              <i />
+              <em aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 2v10M3 8l4 4 4-4" />
+                </svg>
+              </em>
+              <span>
+                <u />
+                Scroll to explore
+                <u />
+              </span>
             </button>
           </div>
 
@@ -1299,7 +1147,7 @@ export default function About() {
             </div>
             <ol>
               {CH.map((x, i) => (
-                <li key={x.place} className={idx === i ? 'on' : ''}>
+                <li key={x.place} className={idx === i || (idx < 0 && i === 0) ? 'on' : ''}>
                   <button type="button" onClick={() => goChapter(i)}>
                     <b>0{i + 1}</b>
                     <span>{x.place}</span>

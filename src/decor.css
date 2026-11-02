@@ -1,0 +1,217 @@
+@import url('https://fonts.googleapis.com/css2?family=Mr+Dafoe&display=swap');
+
+/* ================================================================
+   Home showroom decor: window light, floor, plants, plinths + sneaker, chalkboard
+   (all of it sits behind the rack and ignores the pointer)
+   Sizes follow the reference screenshot (1672 x 941).
+================================================================ */
+
+.decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 0.45s;
+}
+.decor.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.45s,
+    visibility 0s 0.45s;
+}
+
+/* soft diagonal window light on the wall */
+.dc-light {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(112deg, transparent 8%, #ffffff55 14%, transparent 22%, #ffffff40 30%, transparent 40%),
+    linear-gradient(112deg, transparent 46%, #12121008 52%, transparent 60%, #1212100a 70%, transparent 78%),
+    radial-gradient(90% 60% at 30% 0%, #ffffff66, transparent 70%);
+}
+
+/* polished floor */
+.dc-floor {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 11.3vh;
+  border-top: 1px solid #12121014;
+  background:
+    linear-gradient(180deg, #12121010, transparent 30%),
+    linear-gradient(105deg, #f4f3f0 0%, #e6e5e1 40%, #f1f0ed 70%, #dedcd7 100%);
+}
+.dc-floor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, #ffffff66 32%, transparent 44%);
+}
+
+/* plants (cut-out photo) */
+.dc-plant {
+  position: absolute;
+  left: -20vw;
+  bottom: 7vh;
+  height: 80vh;
+  width: auto;
+  filter: drop-shadow(8px 12px 12px #12121026);
+}
+.dc-plant-br {
+  position: absolute;
+  right: -16vw;
+  bottom: -26vh;
+  height: 68vh;
+  width: auto;
+  opacity: 0.92;
+  filter: blur(5px);
+  transform: scaleX(-1);
+}
+
+/* stone plinths with a sneaker on top */
+.dc-plinths {
+  position: absolute;
+  left: 6vw;
+  bottom: 10.6vh;
+  width: 15vw;
+  height: 20vh;
+}
+.dc-block {
+  position: absolute;
+  bottom: 0;
+  background: linear-gradient(100deg, #dedddb, #f1f0ee 45%, #d1cfcb);
+  box-shadow:
+    inset 0 0 0 1px #12121010,
+    0 12px 18px -8px #12121030;
+}
+.dc-block.a {
+  left: 0;
+  width: 10.8vw;
+  height: 19.8vh;
+}
+.dc-block.b {
+  left: 6.9vw;
+  width: 7.2vw;
+  height: 11.8vh;
+  z-index: 2;
+}
+.dc-block.a::before,
+.dc-block.b::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 7%;
+  background: linear-gradient(180deg, #ffffffcc, #ffffff00);
+}
+.dc-shoe {
+  position: absolute;
+  left: -0.4vw;
+  bottom: calc(19.8vh - 2.6vw);
+  z-index: 3;
+  width: 11.7vw;
+  height: auto;
+  filter: drop-shadow(0 5px 4px #12121030);
+}
+
+/* chalkboard poster: tall, thin black frame, brush lettering */
+.dc-board {
+  position: absolute;
+  right: 1.5vw;
+  top: 20.7vh;
+  width: 9.6vw;
+  min-width: 110px;
+  aspect-ratio: 0.46;
+  padding: clamp(4px, 0.4vw, 7px);
+  background: linear-gradient(135deg, #2b2b2d, #070708 65%);
+  border-radius: 4px;
+  transform: perspective(1000px) rotateY(-7deg) rotateZ(0.6deg);
+  box-shadow:
+    -10px 16px 24px -8px #12121055,
+    inset 0 0 0 1px #ffffff1c;
+}
+.dc-board-in {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  padding: 0 0 0 11%;
+  overflow: hidden;
+  border-radius: 2px;
+  background:
+    radial-gradient(120% 70% at 35% 15%, #1f1f20, transparent 70%),
+    linear-gradient(180deg, #19191a, #0f0f10);
+  box-shadow: inset 0 0 0 1px #000, inset 0 0 18px #00000088;
+  color: #f4f2ec;
+  font-family: 'Mr Dafoe', 'Segoe Script', 'Snell Roundhand', 'Brush Script MT', cursive;
+  font-style: normal;
+  white-space: nowrap;
+  font-size: clamp(22px, 2.9vw, 48px);
+  line-height: 1.02;
+}
+.dc-board-in span:nth-child(1) {
+  margin-left: 0.05em;
+}
+.dc-board-in span:nth-child(2) {
+  margin-left: 0.18em;
+}
+.dc-board-in span:nth-child(3) {
+  margin-left: 0;
+}
+.dc-board-in i {
+  display: block;
+  width: 78%;
+  height: 0.2em;
+  margin: 0.14em 0 0 0;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #86b300, var(--accent) 60%, #d8ff6a);
+  transform: rotate(-12deg);
+  transform-origin: 0 50%;
+  box-shadow: 0 0 6px #c8ff2e55;
+}
+
+/* one centred caption under the rack (hovered piece, otherwise the middle one) */
+.rack-caption {
+  display: none;
+}
+.rack-center-cap {
+  position: absolute;
+  left: 50%;
+  bottom: 15vh;
+  translate: -50% 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+  pointer-events: none;
+  animation: fade 0.35s ease;
+}
+.rack-center-cap b {
+  font-size: clamp(14px, 1.45vw, 21px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.rack-center-cap span {
+  font-size: clamp(14px, 1.4vw, 20px);
+  font-weight: 600;
+  color: var(--mute);
+}
+
+@media (max-width: 900px) {
+  .dc-plinths,
+  .dc-board,
+  .dc-plant-br {
+    display: none;
+  }
+  .dc-plant {
+    left: -40vw;
+    height: 55vh;
+    opacity: 0.9;
+  }
+  .rack-center-cap {
+    bottom: 12vh;
+  }
+}

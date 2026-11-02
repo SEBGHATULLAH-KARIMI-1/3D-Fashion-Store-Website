@@ -78,7 +78,7 @@
 
 /* ---------- 3D city blocks ---------- */
 .bk {
-  --hh: calc(var(--h) * var(--hs, 1));
+  --hh: var(--h); /* growth is done by scaling .fl-city along Z, not by re-laying-out every face */
   --c1: #ffffff;
   --c2: #e9edf8;
   --c3: #cdd4e8;
@@ -161,13 +161,13 @@
 }
 .bk .s {
   left: 0;
-  top: 100%;
+  bottom: 0;
   width: 100%;
   height: var(--hh);
   background-color: var(--c3);
-  background-image: linear-gradient(180deg, #1f2a6a55 0, #0000 24%), var(--wa, none);
-  transform-origin: 0 0;
-  transform: rotateX(90deg);
+  background-image: linear-gradient(0deg, #1f2a6a55 0, #0000 24%), var(--wa, none);
+  transform-origin: 0 100%;
+  transform: rotateX(-90deg);
 }
 .bk .n {
   left: 0;
@@ -176,28 +176,28 @@
   height: var(--hh);
   background-color: var(--c2);
   background-image: linear-gradient(0deg, #1f2a6a55 0, #0000 24%), var(--wa, none);
-  transform-origin: 0 100%;
-  transform: rotateX(-90deg);
+  transform-origin: 50% 100%;
+  transform: rotateX(-90deg) rotateY(180deg);
 }
 .bk .e {
-  left: 100%;
+  right: 0;
   top: 0;
   width: var(--hh);
   height: 100%;
   background-color: var(--c3);
-  background-image: linear-gradient(90deg, #1f2a6a55 0, #0000 24%), var(--wb, none);
-  transform-origin: 0 0;
-  transform: rotateY(-90deg);
+  background-image: linear-gradient(270deg, #1f2a6a55 0, #0000 24%), var(--wb, none);
+  transform-origin: 100% 0;
+  transform: rotateY(90deg);
 }
 .bk .w {
-  right: 100%;
+  left: 0;
   top: 0;
   width: var(--hh);
   height: 100%;
   background-color: var(--c2);
-  background-image: linear-gradient(270deg, #1f2a6a55 0, #0000 24%), var(--wb, none);
-  transform-origin: 100% 0;
-  transform: rotateY(90deg);
+  background-image: linear-gradient(90deg, #1f2a6a55 0, #0000 24%), var(--wb, none);
+  transform-origin: 0 0;
+  transform: rotateY(-90deg);
 }
 /* soft ground shadow, thrown to the south-east */
 .bk .sd {
@@ -209,7 +209,7 @@
 
 /* water + traffic */
 .rv {
-  animation: rvflow 9s linear infinite;
+  animation: rvflow 9s steps(60) infinite;
 }
 @keyframes rvflow {
   to {
@@ -348,22 +348,13 @@
   background: radial-gradient(closest-side, #2f4bff12, transparent);
   pointer-events: none;
 }
-.fl-dof {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  -webkit-backdrop-filter: blur(7px);
-  backdrop-filter: blur(7px);
-  -webkit-mask-image: linear-gradient(#000 0%, transparent 34%, transparent 84%, #000 100%);
-  mask-image: linear-gradient(#000 0%, transparent 34%, transparent 84%, #000 100%);
-}
+/* (.fl-dof, a full-screen backdrop blur over the whole 3D scene, was removed: very expensive) */
 .fl-leak {
   position: absolute;
   width: 62vw;
   height: 62vw;
   border-radius: 50%;
   background: radial-gradient(circle, #6f86ff33, transparent 62%);
-  filter: blur(30px);
   pointer-events: none;
 }
 .fl-leak.a {
@@ -417,12 +408,10 @@
 }
 .fl-grain {
   position: absolute;
-  inset: -20%;
+  inset: 0;
   pointer-events: none;
-  opacity: 0.08;
-  mix-blend-mode: multiply;
+  opacity: 0.06;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
-  animation: grain 0.7s steps(7) infinite;
 }
 @keyframes grain {
   0% {
@@ -570,7 +559,7 @@
   color: transparent;
   animation:
     fl-rise 1.6s var(--ease-out) 1.5s backwards,
-    shimmer 7s linear 3s infinite;
+    shimmer 7s linear 3s 2;
 }
 @keyframes shimmer {
   to {
@@ -955,19 +944,19 @@
   box-shadow: inset 0 0 0 1px #ffffff55;
 }
 .bk .s {
-  background-image: linear-gradient(180deg, #12121050 0, #0000 24%), var(--wa, none);
+  background-image: linear-gradient(0deg, #12121050 0, #0000 24%), var(--wa, none);
 }
 .bk .n {
   background-image: linear-gradient(0deg, #12121050 0, #0000 24%), var(--wa, none);
 }
 .bk .e {
-  background-image: linear-gradient(90deg, #12121050 0, #0000 24%), var(--wb, none);
-}
-.bk .w {
   background-image: linear-gradient(270deg, #12121050 0, #0000 24%), var(--wb, none);
 }
+.bk .w {
+  background-image: linear-gradient(90deg, #12121050 0, #0000 24%), var(--wb, none);
+}
 .bk .sd {
-  box-shadow: calc(var(--hh) * 0.32) calc(var(--hh) * 0.26) calc(var(--hh) * 0.3) calc(var(--hh) * 0.04) #12121055;
+  box-shadow: calc(var(--hh) * 0.32) calc(var(--hh) * 0.26) min(calc(var(--hh) * 0.3), 34px) calc(var(--hh) * 0.04) #12121055;
 }
 
 /* pins */
@@ -1104,7 +1093,7 @@
 
 /* traffic: cars drive along both lanes of the avenue */
 .cr {
-  animation: carflow 9s linear infinite;
+  animation: carflow 9s steps(270) infinite;
 }
 .cr.c2 {
   animation-delay: -4.5s;
@@ -1124,6 +1113,489 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .cr {
+    animation: none;
+  }
+}
+
+/* ================================================================
+   Performance
+================================================================ */
+
+/* Buildings grow by scaling this wrapper along Z (see the tick in About.jsx). */
+.fl-city {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transform: scale3d(1, 1, 0.0001);
+}
+
+/* Walls are laid out so their FRONT side faces outwards; the browser then skips the
+   ones turned away from the camera (about half) instead of drawing them. */
+.bk .s,
+.bk .n,
+.bk .e,
+.bk .w {
+  backface-visibility: hidden;
+}
+
+/* ground shadows fade in once the buildings have mostly grown */
+.bk .sd {
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+.fl-city.grown .bk .sd {
+  opacity: 1;
+}
+
+/* glowing route: the dash offset is a single variable set from JS */
+.rt {
+  stroke-dashoffset: var(--off, 1);
+}
+
+/* river glints and traffic only move while the city is on screen */
+.fl-world:not(.run) .rv,
+.fl-world:not(.run) .cr {
+  animation-play-state: paused;
+}
+
+/* ================================================================
+   NEW COVER — cream sky, photo globe, orbit ring, big serif title
+   (only the first screen changes; the city / avenue dive is untouched)
+================================================================ */
+.pg.about {
+  --bg: #f6f1e3;
+  --hud-h: 74px;
+  --olive: #8d9a1f;
+  --gd: min(58dvh, 58vw); /* diameter of the globe */
+}
+.fl-sky {
+  background: radial-gradient(90% 80% at 50% 45%, #fbf8ee 0%, #f6f1e3 60%, #efe8d3 100%);
+}
+/* the old white curtain bars and corner brackets are gone */
+.fl-bar,
+.fl-frame {
+  display: none;
+}
+
+/* city phase: the fog and the text glows use the cream colour now */
+.fl-fog {
+  background:
+    linear-gradient(180deg, #f6f1e3 0%, #f6f1e3ee 10%, #f6f1e388 24%, transparent 46%),
+    linear-gradient(0deg, #f6f1e388, transparent 20%);
+}
+.fl-cap::before {
+  background: radial-gradient(closest-side, #f6f1e3ee 35%, #f6f1e300);
+}
+.fl-outro::before {
+  background: radial-gradient(closest-side at 50% 50%, #f6f1e3ee 28%, #f6f1e300 74%);
+}
+.pin-card {
+  background: linear-gradient(90deg, #f6f1e3ee, #f6f1e300);
+}
+
+/* ---------- green glow, thin arcs, clouds ---------- */
+.fl-air {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(55% 62% at 2% 6%, #d6e27ecc, #d6e27e00 70%),
+    radial-gradient(48% 55% at 100% 96%, #c9dc6fc0, #c9dc6f00 70%),
+    radial-gradient(34% 40% at 50% 43%, #fffdf6, #fffdf600 72%);
+}
+.fl-arc {
+  position: absolute;
+  fill: none;
+  stroke: #9aa92e;
+  stroke-width: 1.4;
+  stroke-opacity: 0.65;
+  overflow: visible;
+}
+.fl-arc path {
+  vector-effect: non-scaling-stroke;
+}
+.fl-arc.a {
+  left: 0;
+  top: 2dvh;
+  width: 46vw;
+  height: 46dvh;
+}
+.fl-arc.b {
+  right: 0;
+  bottom: 8dvh;
+  width: 34vw;
+  height: 40dvh;
+}
+.fl-cloud {
+  position: absolute;
+  bottom: -4dvh;
+  width: 38vw;
+  height: 36dvh;
+  background:
+    radial-gradient(28% 34% at 22% 52%, #ffffff 40%, #fff0 75%),
+    radial-gradient(26% 40% at 42% 38%, #ffffff 40%, #fff0 76%),
+    radial-gradient(24% 36% at 62% 55%, #fffffff2 35%, #fff0 76%),
+    radial-gradient(30% 38% at 80% 72%, #ffffffe6 30%, #fff0 76%),
+    radial-gradient(70% 36% at 45% 92%, #ffffff 40%, #fff0 76%),
+    radial-gradient(60% 50% at 50% 60%, #e3e6c299, #e3e6c200 70%);
+}
+.fl-cloud.l {
+  left: -7vw;
+}
+.fl-cloud.r {
+  right: -9vw;
+  transform: scaleX(-1);
+  height: 40dvh;
+}
+
+/* ---------- the globe: the photo in src/earth.jpg, cut to a circle ---------- */
+.fl-earth {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  z-index: 2;
+  width: var(--gd);
+  height: var(--gd);
+  translate: -50% -50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.fl-shadow {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: -19%;
+  height: 13%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #2c341099, #2c341000);
+}
+.fl-orb {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #0a2650;
+}
+/* soft blue halo: a plain gradient (a big box-shadow blur was much heavier) */
+.fl-glow {
+  position: absolute;
+  inset: -15%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #8fc4ff00 77%, #8fc4ff66 86%, #8fc4ff00 100%);
+}
+.fl-gl {
+  position: absolute;
+  inset: 0;
+  display: none;
+  width: 100%;
+  height: 100%;
+}
+.fl-orb.gl .fl-gl {
+  display: block;
+}
+.fl-orb.gl img {
+  display: none;
+}
+/* the photo is 736 x 1104 with the globe centred at (366, 553), radius 314:
+   these sizes put exactly that circle inside the round box (a hair larger, to hide the dark edge) */
+.fl-orb img {
+  position: absolute;
+  left: -8.88%;
+  top: -38.96%;
+  width: 118.4%;
+  max-width: none;
+  height: auto;
+  user-select: none;
+}
+.fl-orb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #ffffff26, #ffffff00 38%);
+}
+
+/* orbit ring with beads and the floating pieces */
+.fl-ringwrap {
+  position: absolute;
+  inset: 0;
+}
+.fl-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190%;
+  max-width: none;
+  height: auto;
+  translate: -50% -50%;
+  rotate: -17deg;
+  overflow: visible;
+}
+.fl-floater {
+  position: absolute;
+  max-width: none;
+  height: auto;
+  rotate: var(--rot, 0deg);
+  animation: floatY 7s ease-in-out infinite;
+}
+@keyframes floatY {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -12px;
+  }
+}
+
+/* ---------- title ---------- */
+.fl-intro {
+  display: block;
+  padding: 0;
+}
+/* fade + rise only (the old intro animation also animated a blur filter, which is heavy) */
+.fl-intro > * {
+  animation: cover-in 1.1s var(--ease-out) backwards;
+}
+@keyframes cover-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+.fl-intro > :nth-child(1) {
+  animation-delay: 0.3s;
+}
+.fl-intro > :nth-child(2) {
+  animation-delay: 0.9s;
+}
+.fl-titlebox {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 49%;
+  translate: 0 -50%;
+  padding: 0 2vw;
+  text-align: center;
+}
+.fl-brand {
+  margin: 0;
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--a-ink);
+  font-family: var(--serif);
+  font-size: clamp(36px, 9vw, 180px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  animation: none;
+}
+.fl-o {
+  position: relative;
+  display: inline-block;
+}
+.fl-o b {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  width: 0.27em;
+  height: 0.27em;
+  translate: -50% -50%;
+  background: linear-gradient(135deg, #e3f55c, #86a300);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  animation: twinkle 3.2s ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.72) rotate(45deg);
+    opacity: 0.75;
+  }
+}
+.fl-sub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.2vw;
+  max-width: none;
+  margin-top: 2.2dvh;
+  color: #1b1b14;
+  font-family: var(--serif);
+  font-size: clamp(13px, 1.45vw, 26px);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+}
+.fl-sub i {
+  display: block;
+  flex: 0 1 11vw;
+  height: 1.5px;
+  background: linear-gradient(90deg, #8d9a1f00, #8d9a1f);
+}
+.fl-sub i:last-child {
+  background: linear-gradient(270deg, #8d9a1f00, #8d9a1f);
+}
+
+/* scroll to explore */
+.fl-enter {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--hud-h) + 2.6dvh);
+  translate: -50% 0;
+  gap: 14px;
+  margin: 0;
+  pointer-events: auto;
+}
+.fl-enter em {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 52px;
+  border: 1.5px solid #6f7a14;
+  border-radius: 999px;
+  background: #f9f6ebcc;
+  color: #4d5a0a;
+  animation: bob 2.2s ease-in-out infinite;
+}
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+.fl-enter span {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  color: #222;
+  font: 600 11px var(--font-sans);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+}
+.fl-enter u {
+  display: block;
+  width: 5.5vw;
+  height: 1.5px;
+  background: linear-gradient(90deg, #8d9a1f00, #8d9a1f);
+  text-decoration: none;
+}
+.fl-enter u:last-child {
+  background: linear-gradient(270deg, #8d9a1f00, #8d9a1f);
+}
+
+/* ---------- chapter bar at the bottom ---------- */
+.fl-cap {
+  bottom: calc(var(--hud-h) + 32px);
+}
+.fl-hud {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--hud-h);
+  background: #f7f3e6ea;
+  border-top: 1px solid #12121022;
+}
+.fl-prog {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  margin: 0;
+  background: transparent;
+}
+.fl-prog i {
+  background: var(--olive);
+}
+.fl-hud ol {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  height: 100%;
+}
+.fl-hud li {
+  position: relative;
+  display: flex;
+}
+.fl-hud li + li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 24%;
+  bottom: 24%;
+  width: 1px;
+  background: #8d9a1f99;
+}
+.fl-hud button {
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  color: #1b1b14;
+  font: 500 13px var(--font-sans);
+  letter-spacing: 0.3em;
+}
+.fl-hud button b {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+.fl-hud button:hover,
+.fl-hud li.on button {
+  color: #1b1b14;
+}
+.fl-hud li.on button b {
+  box-shadow: none;
+  color: var(--olive);
+}
+
+@media (max-width: 760px) {
+  .pg.about {
+    --hud-h: 58px;
+  }
+  .fl-hud {
+    left: 0;
+    right: 0;
+  }
+  .fl-hud button b {
+    font-size: 16px;
+  }
+  .fl-sub {
+    letter-spacing: 0.22em;
+    gap: 3vw;
+  }
+  .fl-sub i,
+  .fl-enter u {
+    display: none;
+  }
+  .fl-enter span {
+    letter-spacing: 0.3em;
+  }
+  .fl-cloud {
+    width: 52vw;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fl-floater,
+  .fl-o b,
+  .fl-enter em,
+  .fl-intro > * {
     animation: none;
   }
 }
