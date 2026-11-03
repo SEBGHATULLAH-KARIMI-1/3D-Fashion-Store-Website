@@ -1,0 +1,145 @@
+/* ================================================================
+   Responsive pass for the Home page (rack + orbit) and the header.
+   Imported LAST in main.jsx, so it refines anything in the other sheets.
+
+   Rack sizing rule: 7 garments at a pitch of 0.33 * --iw take about
+   2.9 * --iw of width, so --iw must stay <= rail-width / 2.9.
+   (e.g. 33vw * 2.9 = 96vw, which fits a 96% rail.)
+================================================================ */
+
+/* ---------- laptops / small desktops ---------- */
+@media (max-width: 1280px) {
+  .rack {
+    --iw: min(35vh, 25vw);
+  }
+}
+
+/* ---------- tablets ---------- */
+@media (max-width: 1024px) {
+  .rack {
+    --iw: min(34vh, 28vw);
+    --rail-w: 90%;
+  }
+  .orbit {
+    --iw: min(34vh, 32vw);
+  }
+  .orbit-arrow.l {
+    left: 3vw;
+  }
+  .orbit-arrow.r {
+    right: 3vw;
+  }
+}
+
+/* ---------- portrait tablets + phones: rack sits lower, caption follows it ---------- */
+@media (max-width: 900px) and (orientation: portrait) {
+  .rack {
+    --rail-y: 33%;
+  }
+  .rack-center-cap {
+    top: calc(var(--rail-y) + var(--iw) * 1.385 + 3.5vh);
+    bottom: auto;
+  }
+}
+
+/* ---------- phones ---------- */
+@media (max-width: 640px) {
+  .site-header {
+    padding-inline: 12px;
+  }
+  .site-header > * {
+    min-width: 0;
+  }
+  .wordmark {
+    font-size: 14px;
+  }
+
+  /* all 7 garments stay on the rail, which runs almost edge to edge */
+  .rack {
+    --iw: min(31vh, 33vw);
+    --rail-y: 36%;
+    --rail-w: 96%;
+  }
+  .rack-scene {
+    transition-duration: 0.4s;
+  }
+  .rack-center-cap b,
+  .rack-center-cap span {
+    font-size: 15px;
+  }
+
+  /* long hint text must wrap instead of running off the screen */
+  .hint {
+    bottom: calc(var(--foot-h) + 4vh);
+    max-width: 88vw;
+    white-space: normal;
+    text-align: center;
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+  }
+
+  .orbit {
+    --iw: min(32vh, 52vw);
+  }
+  .orbit-caption {
+    bottom: calc(var(--foot-h) + 10vh);
+  }
+  .orbit-arrow {
+    width: 40px;
+    height: 40px;
+    margin-top: -20px;
+  }
+}
+
+/* ---------- very narrow phones ---------- */
+@media (max-width: 380px) {
+  .vsw {
+    width: 112px;
+  }
+  .wordmark {
+    font-size: 12.5px;
+  }
+  .rack {
+    --iw: min(29vh, 32vw);
+  }
+}
+
+/* ---------- landscape phones (short screens) ---------- */
+@media (max-height: 520px) and (orientation: landscape) {
+  :root {
+    --head-h: 52px;
+  }
+  .rack {
+    --iw: min(30vh, 20vw);
+    --rail-y: 33%;
+    --rail-w: 80%;
+  }
+  .rack-center-cap {
+    top: auto;
+    bottom: 2vh;
+  }
+  .rack-center-cap b,
+  .rack-center-cap span {
+    font-size: 13px;
+  }
+  .orbit {
+    --iw: min(40vh, 26vw);
+  }
+  .orbit-caption {
+    bottom: 4vh;
+  }
+  .hint {
+    display: none;
+  }
+}
+
+/* ---------- touch screens: no hover-only affordances ---------- */
+@media (hover: none) {
+  .rack-hit {
+    -webkit-tap-highlight-color: transparent;
+  }
+  .orbit,
+  .rack {
+    touch-action: pan-y;
+  }
+}
