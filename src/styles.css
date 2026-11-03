@@ -40,11 +40,11 @@ ul {
 @property --tint {
   syntax: '<color>';
   inherits: true;
-  initial-value: #e9e8e4;
+  initial-value: #f3f2ee;
 }
 
 :root {
-  --paper: #e9e8e4;
+  --paper: #f3f2ee;
   --ink: #121210;
   --mute: #6f6d66;
   --accent: #c8ff2e;
@@ -90,7 +90,7 @@ a:focus-visible {
 
 /* ---------- shell ---------- */
 .wall {
-  --tint: #e9e8e4;
+  --tint: #f3f2ee;
   --mx: 0;
   --my: 0;
   position: relative;
@@ -102,7 +102,7 @@ a:focus-visible {
       110% 80% at 50% 18%,
       color-mix(in srgb, var(--tint) 70%, white) 0%,
       var(--tint) 52%,
-      color-mix(in srgb, var(--tint) 86%, black) 100%
+      color-mix(in srgb, var(--tint) 94%, black) 100%
     );
   transition: --tint 0.9s ease;
 }
@@ -122,7 +122,7 @@ a:focus-visible {
   position: absolute;
   inset: auto 0 0 0;
   height: 26%;
-  background: linear-gradient(transparent, rgba(18, 18, 16, 0.07));
+  background: linear-gradient(transparent, rgba(18, 18, 16, 0.035));
   pointer-events: none;
 }
 

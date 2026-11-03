@@ -1127,6 +1127,24 @@ textarea {
   color: var(--mute);
 }
 
+/* ---------- header backdrop on scrolling pages ----------
+   Hero text (the bio / lede) scrolls up under the transparent header and
+   collided with the nav. A paper-coloured strip that fades out sits behind
+   the header content, so the text disappears softly before it reaches it. */
+.wall:has(.pg.lookbook) .site-header::after,
+.wall:has(.pg.shop) .site-header::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 -26px 0;
+  z-index: -1;
+  background: linear-gradient(
+    color-mix(in srgb, var(--tint) 78%, white) 0%,
+    color-mix(in srgb, var(--tint) 78%, white) 64%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
 /* ---------- responsive ---------- */
 @media (max-width: 980px) {
   .nav {

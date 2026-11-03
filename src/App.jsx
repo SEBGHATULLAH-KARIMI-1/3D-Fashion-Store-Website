@@ -18,7 +18,7 @@ const Lookbook = lazy(loadLookbook)
 const About = lazy(loadAbout)
 const Contact = lazy(loadContact)
 
-const DEFAULT_TINT = '#e9e8e4'
+const DEFAULT_TINT = '#f3f2ee'
 
 export default function App() {
   const route = useRoute()
@@ -130,7 +130,7 @@ export default function App() {
       className="wall"
       ref={wallRef}
       onPointerMove={onWallMove}
-      style={{ '--tint': focus ? variant.wall : cool ? '#f7f8fc' : DEFAULT_TINT }}
+      style={{ '--tint': focus ? variant.wall : cool ? '#fbfcfe' : DEFAULT_TINT }}
     >
       <Header
         route={route}
